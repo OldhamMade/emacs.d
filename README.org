@@ -7,8 +7,6 @@
   development.
 
 * To Do
-** Auto-formatting
-https://github.com/raxod502/apheleia
 ** MC with Hercules
 ** Aggressive indent mode
 https://github.com/Malabarba/aggressive-indent-mode
@@ -17,6 +15,14 @@ https://github.com/Malabarba/aggressive-indent-mode
 https://github.com/leotaku/flycheck-aspell/
 ** Emacs Refactor
 https://github.com/Wilfred/emacs-refactor#user-content-extension
+** Better Forge interaction
+*** https://github.com/sshaw/git-link
+*** https://github.com/anticomputer/gh-notify
+*** https://github.com/vermiculus/magithub
+** CTRLF
+*** Search highlighted
+When test is marked/highlighted, the default search term should be
+exactly that (like what deadgrep does).
 
 * Configuration
 ** General improvements
@@ -27,6 +33,12 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
    #+BEGIN_SRC emacs-lisp :tangle yes
      ;; -*- lexical-binding: t; -*-
    #+END_SRC
+
+*** Don't GC during startup to save time
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (setq gc-cons-percentage 0.6)
+      (setq gc-cons-threshold most-positive-fixnum)
+    #+END_SRC
 
 *** Disable using tabs as indents
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -135,6 +147,16 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package general)
+    #+END_SRC
+
+*** Use =add-hooks= for adding multiple hooks at once
+
+    =add-hooks= simplifies multiple hook declarations into single declarative calls.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package add-hooks
+        :ensure t
+        :demand t)
     #+END_SRC
 
 ** Environment
@@ -303,18 +325,18 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 *** Integrate with =direnv=
 
      =direnv= is a great tool for managing local environment variables
-     during development. The =direnv= package integrates with Emacs
+     during development. The =envrc= package integrates with Emacs
      so that programs started from within emacs, such as inferior
      shells, linters, compilers, and test runners, will be hooked up
      in the correct =$PATH=, and will be started with the correct
      environment variables set.
 
      #+BEGIN_SRC emacs-lisp :tangle yes
-       (use-package direnv
-         ;:hook (after-init . direnv-mode)
+       (use-package envrc
+         :hook (after-init . envrc-global-mode)
          :demand t
-         :general (:keymaps 'direnv-envrc-mode-map
-                   "C-c C-c" 'direnv-allow))
+         :general (:keymaps 'envrc-mode-map
+                   "C-c E" '(envrc-command-map :which-key "envrc")))
      #+END_SRC
 
 ** Theme
@@ -365,7 +387,14 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package dash-at-point
-        :bind ("C-c d" . dash-at-point))
+        :general (:prefix "C-c d"
+                  "" '(:ignore t :which-key "Docs") ;; rename +prefix
+                  "d" 'dash-at-point))
+    #+END_SRC
+
+*** Show "free" keys for new keybindings
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package free-keys)
     #+END_SRC
 
 ** Modeline
@@ -464,6 +493,35 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
           (aw-dispatch-always t))
     #+END_SRC
 
+**** Hide the cursors when ace-window is active
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (define-advice aw-select (:around (fun &rest r) cursor-stuff)
+         (let ((cursor-in-non-selected-windows nil))
+           (apply fun r)))
+     #+END_SRC
+
+**** Always trigger ace-buffer for certain actions
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (defun my/display-buffer (buffer alist)
+         (require 'ace-window)
+         (let ((aw-ignore-current (cdr (assq 'inhibit-same-window alist)))
+               (aw-scope (pcase (cdr (assq 'reusable-frames alist))
+                           ((pred not) 'frame)
+                           ('visible 'visible)
+                           (_ 'global))))
+           (unless (<= (length (aw-window-list)) 1)
+             (window--display-buffer
+              buffer (aw-select "my/display-buffer") 'reuse))))
+
+       (setq display-buffer-base-action '((display-buffer-reuse-window
+                                           my/display-buffer))
+             display-buffer-alist `(,(cons "\\*helm" display-buffer-fallback-action)
+                                    ("magit-diff:" (my/display-buffer)
+                                     (inhibit-same-window . t))))
+     #+END_SRC
+
 *** Allow "rotating" layouts and windows
 
     This is configured to mimic tmux.
@@ -480,7 +538,7 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     #+BEGIN_SRC emacs-lisp :tangle yes
       (setq highlight-nonselected-windows t)
     #+END_SRC
-*** DWIM window management using =Edwina=
+*** DWIM window management using =Edwina= [disabled]
 
     Edwina divides the frame into 2 areas, the master area and the stack. The
     master area contains the largest window(s), and other windows are placed in
@@ -489,7 +547,9 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     Edwina tries to place the master area to the side, but if the frame is too
     narrow for 2 columns it will put it on top instead.
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
+    Disabled for now since the handling of windows can be somewhat confusing.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
     (use-package edwina
       :hook
       (emacs-startup . edwina-mode)
@@ -502,11 +562,9 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       )
     #+END_SRC
 
-*** Automatically balance windows when created [disabled]
+*** Automatically balance windows when created
 
-    Disabled for now as this conflicts with =Edwina=.
-
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package balanced-windows
       :hook (emacs-startup . balanced-windows-mode))
     #+END_SRC
@@ -533,6 +591,35 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
         )
     #+end_src
 
+*** Enforce rules for popup windows
+
+    #+begin_src emacs-lisp :tangle no
+      (use-package shackle
+        :hook (emacs-startup . shackle-mode)
+        :config
+          (setq shackle-default-alignment 'right)
+          (setq shackle-rules
+                '(("*exunit-compilation*" :inhibit-window-quit t :align right :other t)
+                  (magit-status-mode :select t :inhibit-window-quit t :align right :other t)
+                  )))
+    #+end_src
+*** Enable Winner mode to be able to undo window changes
+
+    #+begin_src emacs-lisp :tangle yes
+      (use-package winner
+        :hook (emacs-startup . winner-mode))
+    #+end_src
+
+*** Allow "zooming" a buffer to full-screen
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+    (use-package zoom-window
+      :init (custom-set-variables
+             '(zoom-window-mode-line-color "DarkGreen"))
+      :general
+        ("C-x C-z" 'zoom-window-zoom))
+    #+END_SRC
+
 ** Buffers
 *** Initial buffer major mode: text
 
@@ -549,6 +636,19 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     #+BEGIN_SRC emacs-lisp :tangle yes
       (setq require-final-newline t)
     #+END_SRC
+
+*** Enable auto-save of files as they are edited, so that no changes are lost
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package super-save
+        :hook (emacs-startup . super-save-mode)
+        :custom
+        (super-save-auto-save-when-idle t)  ;; autosave to the real file
+        (super-save-idle-duration 30)  ;; autosave idle wait
+        (auto-save-default nil)  ;; disable autosave to backup file
+        :config
+        (add-to-list 'super-save-hook-triggers 'find-file-hook)
+        )
+    #+END_SRC
 *** New Empty Buffer
 
     Mimic other editors by creating a new, numbered "untitled" buffer
@@ -564,9 +664,17 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       (general-define-key "H-n" 'my/new-empty-buffer)
     #+END_SRC
 
-*** Handle kill operations more intelligently
+*** Keep a list of recently accessed files
 
     #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package recentf
+        :straight nil ;; it's a built-in
+        :hook (emacs-startup . recentf-mode))
+    #+END_SRC
+
+*** Handle kill operations more intelligently [disabled]
+
+    #+BEGIN_SRC emacs-lisp :tangle no
     (use-package kill-or-bury-alive
       :general
         ("H-w" (lambda () (interactive) (kill-or-bury-alive t))
@@ -595,16 +703,45 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
                   (newline))
               (insert (current-time-microseconds))))))
     #+END_SRC
-*** Make buffers without focus less prominent
+*** Make buffers without focus less prominent [disabled]
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
+    Need to configure dimmer-prevent-dimming-predicates for
+    minibuffer, corfu, vertico, etc.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package dimmer
         :hook (emacs-startup . dimmer-mode)
         :config
+        (dimmer-fraction 0.1)
         (dimmer-configure-which-key)
         (dimmer-configure-magit)
         (dimmer-configure-posframe)
         )
+    #+END_SRC
+
+*** Use =ibuffer= for better buffer management
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package ibuffer
+        :straight nil ;; it's a built-in
+        :hook (ibuffer-mode-hook . ibuffer-auto-mode)
+        :general
+          ("C-x C-b" 'ibuffer)
+        :custom
+          (ibuffer-show-empty-filter-groups nil)
+        )
+    #+END_SRC
+
+*** Make sure narrowed buffers maintain their original line numbers
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+    (setq-default display-line-numbers-widen t)
+    #+END_SRC
+
+*** Make sure compilation buffers are "tailed"
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+    (setq compilation-scroll-output t)
     #+END_SRC
 
 ** Minibuffer
@@ -686,11 +823,26 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       :init (save-place-mode 1))
     #+END_SRC
 
-*** Keep the cursor centered while scrolling
+*** Keep the cursor centered while scrolling [disabled]
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
+    I like the idea, but I seem to struggle to work with it.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
     (use-package centered-cursor-mode
       :hook (emacs-startup . centered-cursor-mode))
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (setq scroll-preserve-screen-position t
+            scroll-step 1
+            scroll-margin 99999
+            scroll-conservatively 10000
+            ;scroll-conservatively 0
+            ;scroll-up-aggressively 0.01
+            ;scroll-down-aggressively 0.01
+            maximum-scroll-margin 0.5
+            auto-window-vscroll nil
+            )
     #+END_SRC
 
 *** Expanding regions
@@ -854,6 +1006,74 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       (use-package iedit)
     #+END_SRC
 
+*** Use =avy= to move the cursor around quickly
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package avy
+        :general
+        ("C-'" 'avy-goto-char-timer))
+    #+END_SRC
+
+*** Pulse the active line after movement commands
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package pulsar
+        :hook ((emacs-startup . pulsar-global-mode)
+               (consult-after-jump-hook . pulsar-recenter-middle)
+               (consult-after-jump-hook . pulsar-reveal-entry))
+        :custom
+          (pulsar-pulse t)
+          (pulsar-delay 0.055)
+          (pulsar-pulse-functions '(recenter-top-bottom
+                                    move-to-window-line-top-bottom
+                                    reposition-window
+                                    bookmark-jump
+                                    other-window
+                                    delete-window
+                                    delete-other-windows
+                                    forward-page
+                                    backward-page
+                                    scroll-up-command
+                                    scroll-down-command
+                                    windmove-right
+                                    windmove-left
+                                    windmove-up
+                                    windmove-down
+                                    windmove-swap-states-right
+                                    windmove-swap-states-left
+                                    windmove-swap-states-up
+                                    windmove-swap-states-down
+                                    tab-new
+                                    tab-close
+                                    tab-next
+                                    org-next-visible-heading
+                                    org-previous-visible-heading
+                                    org-forward-heading-same-level
+                                    org-backward-heading-same-level
+                                    outline-backward-same-level
+                                    outline-forward-same-level
+                                    outline-next-visible-heading
+                                    outline-previous-visible-heading
+                                    outline-up-heading
+                                    ctrlf-forward-default
+                                    ctrlf-backward-default
+                                    ctrlf-forward-alternate
+                                    ctrlf-backward-alternate
+                                    ctrlf-forward-symbol
+                                    ctrlf-forward-symbol-at-point
+                                    consult-line)))
+    #+END_SRC
+
+** Browsing
+*** Do what I mean!
+
+    Context-sensitive external browse URL or Internet search from Emacs.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package browse-url-dwim
+        :hook (emacs-startup . browse-url-dwim-mode))
+    #+END_SRC
+
 ** Completion
 *** Fast and minimal vertical completion UI with =Vertico=
 
@@ -881,17 +1101,25 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
           (vertico-cycle t)
           (read-file-name-completion-ignore-case t)
           (read-buffer-completion-ignore-case t)
+          (completion-ignore-case t)
+        )
+    #+END_SRC
         :general
           (:keymaps 'minibuffer-local-map
            "<backspace>" 'my/minibuffer-backward-kill)
-        )
-    #+END_SRC
 
-**** Mimic the way =ivy= jumps back a folder when hitting backspace
+**** Mimic the way =ivy= jumps back a folder when hitting backspace [DISABLED]
 
      Borrowed from https://github.com/raxod502/selectrum/issues/498#issuecomment-803283608
 
-     #+BEGIN_SRC emacs-lisp :tangle yes
+     Disabled for now as I don't like the behaviour. What I want is
+     for this to jump up a directory if deleting at a =/= char,
+     otherwise delete a char. Eg:
+
+     =/opt/thing/foo|= < backspace here would delete =o=
+     =/opt/thing/|= < backspace here would delete =thing/=
+
+     #+BEGIN_SRC emacs-lisp :tangle no
      (defun my/minibuffer-backward-kill (arg)
        "When minibuffer is completing a file name delete up to parent
      folder, otherwise delete a character backward"
@@ -935,17 +1163,16 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package orderless
-         :requires vertico
          :custom
          (completion-styles '(orderless basic))
          (completion-category-defaults nil)
-         (completion-category-overrides '((file (styles . (partial-completion)))))
+         (completion-category-overrides '((file (styles substring partial-completion))))
          (orderless-matching-styles
-          '(orderless-prefixes
-            orderless-initialism
+          '(orderless-initialism
+            orderless-prefixes
             orderless-literal
+            orderless-flex
             orderless-regexp
-            ;orderless-flex
             ))
          )
      #+END_SRC
@@ -957,37 +1184,79 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     item from a list of candidates. Consult tries to offer an improved
     list of suggestions.
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
       (defun my/get-project-root ()
         (when (fboundp 'project-current)
           (project-current)))
 
+    #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package consult
-        :requires (vertico orderless)
+        ;:requires (vertico orderless)
+        :hook (completion-list-mode . consult-preview-at-point-mode)
         :general
+          ("C-x b" 'consult-buffer
+           "C-x M-:" 'consult-complex-command
+           "C-x r b" 'consult-bookmark
+           "C-x p b" 'consult-project-buffer)
           (:keymaps 'minibuffer-local-map
            "C-r" 'consult-history)
           (:keymaps 'goto-map
            "g" 'consult-goto-line
            "M-g" 'consult-goto-line ;; useful shortcut
            )
+          (:prefix "C-c r"
+           "" '(:ignore t :which-key "Registers") ;; rename +prefix
+           "l" 'consult-register-load
+           "s" 'consult-register-save
+           "r" 'consult-register
+           )
         :custom
-        (consult-project-root-function #'my/get-project-root)
+        (register-preview-delay 0.3)
+        ;(consult-project-root-function #'my/get-project-root)
+        ;(consult-project-root-function #'projectile-project-root)
+
+        ;; Configure a different project root function.
+        (autoload 'projectile-project-root "projectile")
+        (setq consult-project-function (lambda (_) (projectile-project-root)))
+
         (completion-in-region-function #'consult-completion-in-region)
+
+        ;; Use Consult to select xref locations with preview
         (xref-show-xrefs-function #'consult-xref)
         (xref-show-definitions-function #'consult-xref)
-        :hook
-        (emacs-startup . consult-preview-mode))
+
+        ;; This adds thin lines, sorting and hides the mode line of the window.
+        (advice-add #'register-preview :override #'consult-register-window)
+
+        ;; Replace `completing-read-multiple' with an enhanced version.
+        (advice-add #'completing-read-multiple :override #'consult-completing-read-multiple)
+        )
     #+END_SRC
+
+**** Better directory navigation with =consult-dir=
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package consult-dir
+         :ensure t
+         :general
+           ("C-x C-d" 'consult-dir)
+           (:keymaps 'vertico-map
+             "C-x C-d" 'consult-dir
+             "C-x C-j" 'consult-dir-jump-file)
+         :custom
+         (consult-dir-project-list-function #'consult-dir-projectile-dirs)
+         )
+     #+END_SRC
 
 **** =lsp-mode= integration
 
-     #+BEGIN_SRC emacs-lisp :tangle yes
+     https://github.com/gagbo/consult-lsp
+
+     Seems to break xref-find-definition, so disabled for now.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
        (use-package consult-lsp
-         :requires (consult lsp)
-         :general
-           (:keymaps 'lsp-mode-map
-            [remap xref-find-apropos] 'consult-lsp-symbols))
+         :config
+         (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols))
      #+END_SRC
 
 *** Contextual commands care of =Embark=
@@ -1004,7 +1273,10 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
          "C-h B" 'embark-bindings)
         :custom
         (prefix-help-command #'embark-prefix-help-command)
+        (embark-mixed-indicator-delay 0.1) ;; show embark popup quicker
         :config
+        ;; Don't quit the minibuffer after removing a buffer from the list
+        (setq embark-quit-after-action '((kill-buffer . t) (t . nil)))
         (setq embark-verbose-indicator-display-action
           '(display-buffer-at-bottom
             (window-height . (lambda (win) (fit-window-to-buffer
@@ -1030,11 +1302,22 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package corfu
-        :requires orderless
-        ;; Optional customizations
+        :hook (lsp-completion-mode . my/corfu-setup-lsp)
+        :general
+        ;("<tab>" 'completion-at-point)
+        (:keymaps 'corfu-map
+         "<tab>" 'corfu-insert
+         "<escape>" 'corfu-quit
+         "<return>" 'corfu-insert
+         "M-d" 'corfu-show-documentation)
+        :init
+        (setq tab-always-indent 'complete)
         :custom
+        (completion-cycle-threshold nil)
+        (corfu-auto t) ;; Enable auto completion
         (corfu-cycle t) ;; Enable cycling for `corfu-next/previous'
-        (corfu-auto t)                 ;; Enable auto completion
+        (corfu-auto-prefix 2) ;; Minimum length of prefix for auto completion.
+        (corfu-auto-delay 0.2)
         ;; (corfu-separator ?\s)          ;; Orderless field separator
         ;; (corfu-quit-at-boundary nil)   ;; Never quit at completion boundary
         ;; (corfu-quit-no-match nil)      ;; Never quit, even if there is no match
@@ -1043,8 +1326,101 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
         ;; (corfu-on-exact-match nil)     ;; Configure handling of exact matches
         ;; (corfu-echo-documentation nil) ;; Disable documentation in the echo area
         ;; (corfu-scroll-margin 5)        ;; Use scroll margin
-        :hook
-        (emacs-startup . global-corfu-mode))
+        (corfu-quit-at-boundary 'separator)     ; a non-nil value is necessary
+        (corfu-separator ?\s)                   ; Use space
+        (corfu-quit-no-match 'separator) ; Don't quit if there is `corfu-separator' inserted
+        (corfu-preview-current 'insert)  ; Preview current candidate?
+        (lsp-completion-provider :none)
+        :config
+        (defun my/corfu-setup-lsp ()
+          "Use orderless completion style with lsp-capf instead of the
+           default lsp-passthrough."
+          (setf (alist-get 'styles (alist-get 'lsp-capf completion-category-defaults))
+                '(orderless)))
+        :init
+        (global-corfu-mode)
+        )
+    #+END_SRC
+
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package corfu
+        :init
+        (setq tab-always-indent 'complete)
+        (setq lsp-completion-provider :none)
+        (defun my/corfu-setup-lsp ()
+          "Use orderless completion style with lsp-capf instead of the
+           default lsp-passthrough."
+          (setf (alist-get 'styles (alist-get 'lsp-capf completion-category-defaults))
+                '(orderless)))
+        :hook (lsp-completion-mode . my/corfu-setup-lsp)
+        :general
+        ;("<tab>" 'completion-at-point)
+        (:keymaps 'corfu-map
+         "<tab>" 'corfu-insert
+         "<escape>" 'corfu-quit
+         "<return>" 'corfu-insert
+         "M-d" 'corfu-show-documentation)
+        :custom
+        (completion-cycle-threshold nil)
+        (corfu-auto t) ;; Enable auto completion
+        (corfu-cycle t) ;; Enable cycling for `corfu-next/previous'
+        (corfu-auto-prefix 2) ;; Minimum length of prefix for auto completion.
+        (corfu-auto-delay 0.2)
+        ;; (corfu-separator ?\s)          ;; Orderless field separator
+        ;; (corfu-quit-at-boundary nil)   ;; Never quit at completion boundary
+        ;; (corfu-quit-no-match nil)      ;; Never quit, even if there is no match
+        ;; (corfu-preview-current nil)    ;; Disable current candidate preview
+        ;; (corfu-preselect-first nil)    ;; Disable candidate preselection
+        ;; (corfu-on-exact-match nil)     ;; Configure handling of exact matches
+        ;; (corfu-echo-documentation nil) ;; Disable documentation in the echo area
+        ;; (corfu-scroll-margin 5)        ;; Use scroll margin
+        (corfu-quit-at-boundary 'separator)     ; a non-nil value is necessary
+        (corfu-separator ?\s)                   ; Use space
+        (corfu-quit-no-match 'separator) ; Don't quit if there is `corfu-separator' inserted
+        (corfu-preview-current 'insert)  ; Preview current candidate?
+        :init
+        (global-corfu-mode)
+        )
+    #+END_SRC
+
+**** Use dabbrev with Corfu
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package dabbrev
+         ;; Swap M-/ and C-M-/
+         :general ("M-/" 'dabbrev-completion
+                   "C-M-/" 'dabbrev-expand)
+         :custom
+         (dabbrev-case-fold-search nil)
+         (dabbrev-case-replace nil))
+     #+END_SRC
+
+*** Enhance completion-at-point again with =Cape=
+
+    Cape provides a bunch of Completion At Point Extensions which can
+    be used in combination with Corfu completion UI or the default
+    completion UI.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package cape
+        :init
+        ;; Add `completion-at-point-functions', used by `completion-at-point'.
+        (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+        (add-to-list 'completion-at-point-functions #'cape-keyword)
+        (add-to-list 'completion-at-point-functions #'cape-file)
+        (add-to-list 'completion-at-point-functions #'cape-sgml)
+        ;;(add-to-list 'completion-at-point-functions #'cape-ispell)
+        ;;(add-to-list 'completion-at-point-functions #'cape-dict)
+        ;;(add-to-list 'completion-at-point-functions #'cape-tex)
+        ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
+        ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
+        ;;(add-to-list 'completion-at-point-functions #'cape-symbol)
+        ;;(add-to-list 'completion-at-point-functions #'cape-line)
+        :custom
+        (completion-at-point-functions
+         (list (cape-super-capf #'cape-dabbrev #'cape-keyword #'cape-file #'cape-sgml)))
+        )
     #+END_SRC
 
 *** Command discovery care of =which-key=
@@ -1123,61 +1499,7 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
           "H-<right>" #'mwim-end))
     #+END_SRC
 
-** Editing
-*** Enable subword mode
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (global-subword-mode 1)
-    #+END_SRC
-
-*** Always append a new line to the file
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (setq require-final-newline t)
-    #+END_SRC
-
-*** Always delete trailing whitespace on save
-    #+BEGIN_SRC emacs-lisp :tangle yes
-      (add-hook 'before-save-hook #'delete-trailing-whitespace)
-    #+END_SRC
-
-*** Add useful keyboard shortcuts with =crux=
-    #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package crux
-      :hook (find-file-hook . crux-reopen-as-root)
-      :general
-        ("C-k" 'crux-smart-kill-line
-         "M-D" #'crux-duplicate-current-line-or-region
-         "H-<backspace>" 'crux-cleanup-buffer-or-region)
-        (:keymaps 'override
-         :prefix "C-c C-f"
-         "" '(:ignore t :which-key "File & Buffer") ;; rename +prefix
-         "r" 'crux-rename-file-and-buffer
-         "k" 'crux-delete-file-and-buffer)
-        (:keymaps 'override
-         :prefix "C-c c"
-         "" '(:ignore t :which-key "Change case") ;; rename +prefix
-         "c" 'crux-capitalize-region
-         "u" 'crux-upcase-region
-         "l" 'crux-downcase-region
-         )
-       :config
-         (crux-reopen-as-root-mode)
-      )
-    #+END_SRC
-
-*** Keybinding to toggle between fill/unfill
-    Unfill adds the inverse of fill-paragraph/-region.
-    #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package unfill
-      :general ("M-q" 'unfill-toggle))
-    #+END_SRC
-
-*** Improve focus during editing [disabled]
-
-    #+BEGIN_SRC emacs-lisp :tangle no
-    (use-package focus
-      :hook (prog-mode . focus-mode))
-    #+END_SRC
-
+** History
 *** Undo/redo
 **** Add =undo-fu= for better undo behaviour
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1207,8 +1529,90 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package undo-hl
          :straight (undo-hl :type git :host github :repo "casouri/undo-hl")
-         :hook (emacs-startup . undo-hl-mode))
+         :hook (after-init . undo-hl-mode))
      #+END_SRC
+*** Add "dog ears" to return to previous edit points [DISABLED]
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package dogears
+        :straight (dogears :type git :host github :repo "alphapapa/dogears.el")
+        :config
+          (add-to-list 'dogears-hooks 'consult-after-jump-hook)
+        :general
+        (:keymaps 'goto-map
+         "h" '(:ignore t :which-key "history") ;; rename +prefix
+         "h h" 'dogears-go
+         "h b" 'dogears-back
+         "h f" 'dogears-forward
+         "h l" 'dogears-list
+         "h s" 'dogears-sidebar))
+    #+END_SRC
+** Editing
+*** Enable subword mode
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (global-subword-mode 1)
+    #+END_SRC
+
+*** Always append a new line to the file
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (setq require-final-newline t)
+    #+END_SRC
+
+*** Always delete trailing whitespace on save
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (add-hook 'before-save-hook #'delete-trailing-whitespace)
+    #+END_SRC
+
+*** Clean whitespace intelligently on key-press
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package shrink-whitespace
+        :general
+          ("<S-backspace>" #'shrink-whitespace))
+    #+END_SRC
+
+*** Add useful keyboard shortcuts with =crux=
+    #+BEGIN_SRC emacs-lisp :tangle yes
+    (use-package crux
+      :hook (find-file-hook . crux-reopen-as-root)
+      :general
+        ("C-k" 'crux-smart-kill-line
+         "M-D" #'crux-duplicate-current-line-or-region
+         "H-<backspace>" 'crux-cleanup-buffer-or-region)
+        (:keymaps 'override
+         :prefix "C-c C-f"
+         "" '(:ignore t :which-key "File & Buffer") ;; rename +prefix
+         "r" 'crux-rename-file-and-buffer
+         "k" 'crux-delete-file-and-buffer)
+        (:keymaps 'override
+         :prefix "C-c c"
+         "" '(:ignore t :which-key "Change case") ;; rename +prefix
+         "c" 'crux-capitalize-region
+         "u" 'crux-upcase-region
+         "l" 'crux-downcase-region
+         )
+       :config
+         (crux-reopen-as-root-mode)
+      )
+    #+END_SRC
+
+*** Toggle between inflections
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package string-inflection-custom
+        :straight (string-inflection :type git :host github :repo "OldhamMade/string-inflection")
+        :general
+          ("C--" 'string-inflection-all-cycle)
+        :hook (elixir-mode . (lambda ()
+                               (local-set-key (kbd "C--") 'string-inflection-elixir-style-cycle)))
+        )
+    #+END_SRC
+
+*** Keybinding to toggle between fill/unfill
+    Unfill adds the inverse of fill-paragraph/-region.
+    #+BEGIN_SRC emacs-lisp :tangle yes
+    (use-package unfill
+      :general ("M-q" 'unfill-toggle))
+    #+END_SRC
+
 *** Parens/pairs
 **** Auto-pair braces
 
@@ -1216,30 +1620,15 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
      leading one is entered, to keep things balanced.
 
      #+BEGIN_SRC emacs-lisp :tangle yes
-       (add-hooks-pair '(prog-mode text-mode) 'electric-pair-mode)
-     #+END_SRC
-
-     Disable it in the minibuffer since it usually gets in the way.
-     #+BEGIN_SRC emacs-lisp :tangle yes
-     (add-hooks-pair '(minibuffer-setup-hook
-                       minibuffer-exit-hook) (lambda () (electric-pair-mode -1)))
-     #+END_SRC
-
-     Disable when =paredit= is enabled.
-
-     #+BEGIN_SRC emacs-lisp :tangle yes
-       (add-hook 'paredit-mode-hook 'max-turn-off-electric-pair-mode)
-     #+END_SRC
-**** More intelligent editing
-
-     Puni contains commands for soft deletion, which means deleting
-     while keeping parentheses (or other delimiters, like html tags)
-     balanced.
-
-     #+BEGIN_SRC emacs-lisp :tangle yes
-       (use-package puni
-         :hook ((emacs-startup . puni-global-mode)
-                (term-mode-hook . puni-disable-puni-mode)))
+       (use-package electric-pair-mode
+         :straight nil ;; it's a built-in
+         :hook (emacs-startup . electric-pair-mode)
+         :custom
+         (electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
+         :init
+         (add-hook 'minibuffer-setup-hook (lambda () (electric-pair-mode 0)))
+         (add-hook 'minibuffer-exit-hook (lambda () (electric-pair-mode 1)))
+         )
      #+END_SRC
 
 *** Indents
@@ -1340,6 +1729,35 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
      (show-paren-mode t)
      #+END_SRC
 
+** Copy/Paste
+*** Allow copying a region in a format ready for external services
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package copy-as-format
+        :general
+        (:prefix "C-c H-c"
+         "" '(:ignore t :which-key "Copy-as-format") ;; rename +prefix
+         "s" 'copy-as-format-slack
+         "g" 'copy-as-format-github
+         "l" 'copy-as-format-gitlab
+         "b" 'copy-as-format-bitbucket
+         "j" 'copy-as-format-jira
+         "m" 'copy-as-format-markdown
+         "r" 'copy-as-format-rst
+         "h" 'copy-as-format-html
+         ))
+    #+END_SRC
+*** Persist mark after =kill-ring-save=
+
+    Taken from https://emacs.stackexchange.com/questions/37980/how-to-save-the-text-selection-and-keep-the-selection-highlight
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (define-advice kill-ring-save (:around (old-fun &rest args) highlight)
+        "Save the text selection and keep the selection highlight."
+        (let (deactivate-mark)
+          (apply old-fun args)
+          (message "Copied!")))
+    #+END_SRC
+
 ** Search/replace
 *** Make in-buffer search more intuitive with =CTRLF=
 
@@ -1361,7 +1779,10 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package ctrlf
-        :hook (emacs-startup . ctrlf-mode))
+        :hook (emacs-startup . ctrlf-mode)
+        ;:general ("C-s" 'ctrlf-forward-symbol-at-point)
+        :custom
+        (ctrlf-auto-recenter t))
     #+END_SRC
 
 *** Highlight matches in query-replace mode
@@ -1382,35 +1803,65 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       :hook ((lisp-mode emacs-lisp-mode) . easy-escape-minor-mode))
     #+END_SRC
 
+*** Add visual feedback for regex searching
+
+    =visual-regexp= for Emacs is like =replace-regexp=, but with live
+    visual feedback directly in the buffer.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package visual-regexp)
+    #+END_SRC
+
+*** Add ability to replace with inflections
+
+    This adds an "inflection" aware version of query-replace. For
+    example, replacing =foo_bar= with =baz_quux= will also replace
+    =foo_bars= with =baz_quuxes=, =FooBar= with =BazQuux=, =FOO_BAR= with
+    =BAZ_QUUX=, and so on.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package replace-with-inflections)
+    #+END_SRC
+
 *** Add =deadgrep= for searching
+
     Ripgrep is faster than grep, and =deadgrep= provides a great
     UI. It also allows inline editing through =deadgrep-edit-mode=,
     which is great for refactoring in combination with =visual-regexp=.
 
     #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package deadgrep
-      :general
-        ("C-c d" 'deadgrep
-         :keymaps 'deadgrep-mode-map
-         "e" 'deadgrep-edit-mode
-         "t" (lambda () (interactive) (deadgrep--search-term nil))
-         "r" (lambda () (interactive) (setq deadgrep--search-type 'regexp) (deadgrep-restart))
-         "s" (lambda () (interactive) (setq deadgrep--search-type 'string) (deadgrep-restart))
-         "d" (lambda () (interactive) (deadgrep--directory nil))
-         :keymaps 'deadgrep-edit-mode-map
-         "<escape>" 'deadgrep-mode
-         )
-      :config
-        (defun config-editing--on-enter-deadgrep-edit-mode (&rest _)
-          (message "Entering edit mode. Changes will be made to underlying files as you edit."))
-        (defun config-editing--on-exit-deadgrep-edit-mode (&rest _)
-          (when (derived-mode-p 'deadgrep-edit-mode)
-            (message "Exiting edit mode.")))
-        (advice-add #'deadgrep-edit-mode :after #'config-editing--on-enter-deadgrep-edit-mode)
-        (advice-add #'deadgrep-mode :before #'config-editing--on-exit-deadgrep-edit-mode)
-        (defun deadgrep--format-command-patch (rg-command)
-          "Add --hidden to rg-command."
-          (replace-regexp-in-string "^rg " "rg --hidden " rg-command)))
+      (use-package deadgrep
+        :custom
+          (custom deadgrep-max-buffers 5)
+          (deadgrep-display-buffer-function 'switch-to-buffer) ; use current buffer
+        :general
+          (:keymaps 'global
+           :prefix "C-c s"
+           "" '(:ignore t :which-key "Search") ;; rename +prefix
+           "r" '(replace-string :which-key "String Replace")
+           "R" '(vr/query-replace :which-key "Regex Replace")
+           "i" '(query-replace-with-inflections :which-key "Inflection Replace")
+           "d" 'deadgrep :which-key "Deadgrep (search)")
+           (:keymaps 'deadgrep-mode-map
+           "e" 'deadgrep-edit-mode
+           "t" (lambda () (interactive) (deadgrep--search-term nil))
+           "r" (lambda () (interactive) (setq deadgrep--search-type 'regexp) (deadgrep-restart))
+           "s" (lambda () (interactive) (setq deadgrep--search-type 'string) (deadgrep-restart))
+           "d" (lambda () (interactive) (deadgrep--directory nil))
+           "?" 'which-key-show-major-mode)
+           (:keymaps 'deadgrep-edit-mode-map
+           "<escape>" 'deadgrep-mode)
+        :config
+          (defun config-editing--on-enter-deadgrep-edit-mode (&rest _)
+            (message "Entering edit mode. Changes will be made to underlying files as you edit."))
+          (defun config-editing--on-exit-deadgrep-edit-mode (&rest _)
+            (when (derived-mode-p 'deadgrep-edit-mode)
+              (message "Exiting edit mode.")))
+          (advice-add #'deadgrep-edit-mode :after #'config-editing--on-enter-deadgrep-edit-mode)
+          (advice-add #'deadgrep-mode :before #'config-editing--on-exit-deadgrep-edit-mode)
+          (defun deadgrep--format-command-patch (rg-command)
+            "Add --hidden to rg-command."
+            (replace-regexp-in-string "^rg " "rg --hidden " rg-command)))
     #+END_SRC
 
 *** Synonym injection
@@ -1418,15 +1869,17 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     Note, wordnet needs to be available on the system.
 
     #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package synosaurus
-      :commands (synosaurus-mode
-                 synosaurus-lookup
-                 synosaurus-choose-and-replace)
-      :general
-        ("C-c S" #'synosaurus-choose-and-replace)
-      :custom
-       (synosaurus-backend 'synosaurus-backend-wordnet
-        synosaurus-choose-method 'default))
+      (use-package synosaurus
+        :commands (synosaurus-mode
+                   synosaurus-lookup
+        p           synosaurus-choose-and-replace)
+        :general
+          (:prefix "C-c S"
+           "" '(:ignore t :which-key "Spelling") ;; rename +prefix
+           "r" #'synosaurus-choose-and-replace)
+        :custom
+         (synosaurus-backend 'synosaurus-backend-wordnet
+          synosaurus-choose-method 'default))
     #+END_SRC
 
 ** Dired
@@ -1460,6 +1913,14 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       )
     #+end_src
 
+** Term
+
+    #+begin_src emacs-lisp :tangle yes
+      (use-package vterm
+        :custom
+        (shell-file-name "/bin/zsh"))
+    #+end_src
+
 ** Tramp
 
     TRAMP mode is excellent for editing files on a remote machine or
@@ -1480,7 +1941,6 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
                                                 '((shell-file-name . "/bin/bash")
                                                   (shell-command-switch . "-c"))))
     #+end_src
-
 ** Version Control
 *** Highlight diff in fringe
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1505,6 +1965,9 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
           (magit-pull-arguments (quote ("--rebase" "--autostash")))
           (magit-push-arguments (quote ("--set-upstream")))
           (magit-log-arguments (quote ("--graph" "--color" "--decorate" "-n256")))
+
+          ;; Popup the process buffer if a command takes longer than this many seconds.
+          (magit-process-popup-time 5)
 
           (magit-repolist-columns
            '(("Name"    25 magit-repolist-column-ident ())
@@ -1538,6 +2001,20 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
        (lambda (orig-fun &rest args) (interactive) (insert "-")))
      #+END_SRC
 
+**** Ensure the =magit-process= window shows for git hooks
+
+     Trying =magit-process-popup-time= instead.
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (defun auto-display-magit-process-buffer (&rest args)
+         "Automatically display the process buffer when it is updated."
+         (let ((magit-display-buffer-noselect t))
+           (magit-process-buffer)))
+
+       (advice-add 'magit-process-insert-section :before
+                   #'auto-display-magit-process-buffer)
+     #+END_SRC
+
 **** Smerge mode [disabled]
     #+begin_src emacs-lisp :tangle no
     (use-package smerge-mode
@@ -1546,6 +2023,13 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
                     :keymap 'smerge-basic-map
                     :show-funs '(smerge-next smerge-prev)
                     :transient t))
+    #+end_src
+
+**** Keep the Magit status buffer fresh
+
+    #+begin_src emacs-lisp :tangle no
+      (use-package magit-filenotify
+        :hook (magit-status-mode-hook . magit-filenotify-mode))
     #+end_src
 
 *** Smerge
@@ -1600,54 +2084,101 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     - vc-annotate mode (get there with =C-x v g= by default)
 
     #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package browse-at-remote)
+      (use-package browse-at-remote
+        :general
+          (:keymaps 'goto-map
+           "r" 'browse-at-remote)
+          )
     #+END_SRC
 
+*** Follow "Conventional Commits" guidelines
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package conventional-commit
+        :straight (conventional-commit :type git :host github :repo "akirak/conventional-commit.el")
+        :hook
+        (git-commit-mode . conventional-commit-setup))
+    #+END_SRC
 *** Projects
 
     #+begin_src emacs-lisp :tangle yes
-    (use-package persp-mode
-      :hook (window-setup . persp-mode)
-      :general ("C-c p" '(:ignore t :which-key "Persp")) ;; rename +prefix
-      )
-
-    (defun my/project-root ()
-      "Return project root path."
-      (project-current)
-      ;; We need to extract third element because `project-current'
-      ;; returns project's information as a list of 3 element,
-      ;; for example (vc Git "project-path")
-      (nth 2 (project-current)))
-
-    (defun my/project-p ()
-      (project-current))
-
-    (defun my/project-name ()
-      "Get project name extracting latest part of project path."
-      (if (my/project-p)
-          (nth 1 (reverse (split-string (my/project-root) "/")))
-        nil))
-
-    (defun my/project-switch-magit ()
-      (interactive)
-      (project-remember-project (project-current))
-      (persp-switch (my/project-name))
-      (let ((pop-up-windows nil))
-        (call-interactively 'magit-status)))
-
-    (defun my/project-edit-direnv ()
-      "Edit .envrc file in project root."
-      (interactive)
-      (find-file (expand-file-name ".envrc" (my/project-root))))
-
-    (use-package project
-      :straight nil ;; it's a built-in
-      :custom
-      (project-switch-commands 'my/project-switch-magit)
-      :general (:keymaps 'project-prefix-map
-                "E" 'my/project-edit-direnv)
-      )
+      (use-package projectile
+        :hook (emacs-startup . projectile-mode)
+        :general
+        (:keymaps 'global
+         "C-x p" '(:keymap projectile-command-map :package projectile :which-key "Projectile"))
+        (:keymaps 'projectile-command-map
+         "A" 'projectile-add-known-project
+         "K" 'projectile-remove-known-project)
+        :custom
+        (projectile-enable-caching t)
+        ; Show the magit status for a project when first opening it
+        (projectile-switch-project-action 'my/magit-status)
+        )
     #+end_src
+
+**** Custom switch command
+
+     The following will open the =magit-status= "full screen" when
+     switching to a project for the first time, but then will follow
+     magit's default rules for opening the status buffer afterwards.
+
+     This is useful to get an overview of the state of a project when
+     first switching to it, but doesn't affect workflow later on when
+     using multiple magit buffers or comparing magit buffers against
+     work buffers.
+
+     #+begin_src emacs-lisp :tangle yes
+      (defun my/magit-status ()
+        (interactive)
+        (magit-status))
+
+      (defadvice my/magit-status (around magit-fullscreen activate)
+        (setq magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
+        ad-do-it
+        (setq magit-display-buffer-function #'magit-display-buffer-traditional))
+     #+end_src
+
+**** Add perspectives (workspaces)
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package perspective
+         :custom
+         (persp-mode-prefix-key (kbd "C-x C-p"))
+         )
+     #+END_SRC
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package persp-projectile
+         :hook (emacs-startup . persp-mode)
+         :general
+         (:keymaps 'perspective-map
+          "x" 'projectile-persp-switch-project)
+          ;; override projectile-switch-project since
+          ;; we always want to be in a perspective
+         (:keymaps 'projectile-command-map
+          "p" 'projectile-persp-switch-project)
+         )
+     #+END_SRC
+**** Add Projectile details to ibuffer
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package ibuffer-projectile
+         :hook (ibuffer-hook . (lambda ()
+                                 (ibuffer-projectile-set-filter-groups)
+                                 (unless (eq ibuffer-sorting-mode 'alphabetic)
+                                   (ibuffer-do-sort-by-alphabetic))))
+         :custom
+         (ibuffer-formats
+          '((mark modified read-only " "
+                  (name 18 18 :left :elide)
+                  " "
+                  (size 9 -1 :right)
+                  " "
+                  (mode 16 16 :left :elide)
+                  " "
+                  project-relative-file)))
+         )
+     #+END_SRC
 
 ** Org
 *** Hide emphasis markers
@@ -1705,6 +2236,12 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
 ** Programming
 *** General enhancements
+**** =xref=
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       ;; Let me control what backends to fall back on
+       (setq-default xref-backend-functions '(t))
+     #+END_SRC
 
 **** DWIM with comments
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1722,24 +2259,196 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
                                  (setq-local fill-function-arguments-argument-sep " "))))
      #+END_SRC
 
+**** Jump to definition using =dumb-jump=
+
+    Note: using init to add the hooks here because the :hook keyword
+    doesn't correctly add dumb-jump.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package dumb-jump
+        :hook
+        (xref-backend-functions . dumb-jump-xref-activate)
+        ;:init
+        ;(add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
+        ;(add-to-list 'xref-backend-functions #'dumb-jump-xref-activate t)
+        :general
+        (:keymaps 'goto-map
+         "j" '(:ignore t :which-key "jump to") ;; rename +prefix
+         "j j" 'dumb-jump-go
+         "j b" 'dumb-jump-back
+         "j o" 'dumb-jump-go-other-window)
+        :custom
+        (dumb-jump-prefer-searcher 'rg)
+        (xref-show-definitions-function #'xref-show-definitions-completing-read)
+        )
+    #+END_SRC
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package dumb-jump
+        :init
+          (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
+        ;:config
+        ;  (remove-hook 'xref-backend-functions #'etags--xref-backend)
+        :general
+        (:keymaps 'goto-map
+         "j" '(:ignore t :which-key "jump to") ;; rename +prefix
+         "j j" 'dumb-jump-go
+         "j b" 'dumb-jump-back
+         "j o" 'dumb-jump-go-other-window)
+        :custom
+        (dumb-jump-prefer-searcher 'rg)
+        (xref-show-definitions-function #'xref-show-definitions-completing-read)
+        )
+    #+END_SRC
+
+**** Toggle between the test and implementation files [disabled]
+
+    Causes a recursive load error.
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package toggle
+        :straight (:package "toggle"
+                   :host github
+                   :repo "zenspider/elisp"
+                   :branch "master"
+                   :files ("toggle.el"))
+        :general
+        ("C-c t" '(toggle-buffer :which-key "Toggle code/test"))
+        ;:config
+        ;(add-to-list 'toggle-mapping-styles '(elixir . (("lib/\\\1.ex" . "test/\\\1_test.exs"))))
+        )
+    #+END_SRC
+
+**** Auto-format code using =apheleia=
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package apheleia
+        :hook
+        (emacs-startup . apheleia-global-mode)
+        :config
+        (push '(mix-format "mix" "format" "-") apheleia-formatters)
+        (push '(elixir-mode . mix-format) apheleia-mode-alist)
+        (push '(graphql-mode . prettier) apheleia-mode-alist)
+        )
+    #+END_SRC
+
+***** Fix formatting for Elixir
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (defun my/fix-apheleia-project-dir (orig-fn &rest args)
+        (let ((project (project-current)))
+          (if (not (null project))
+              (let ((default-directory (project-root project))) (apply orig-fn args))
+            (apply orig-fn args))))
+
+      (advice-add 'apheleia-format-buffer :around #'my/fix-apheleia-project-dir)
+    #+END_SRC
+
 *** Language Server Protocol
 
     #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package lsp-mode
-      :commands lsp
-      :hook (lsp-mode . lsp-enable-which-key-integration)
-      :custom
-        (lsp-keymap-prefix "C-c l")
-        (lsp-auto-configure t)
-        (lsp-auto-guess-root t)
-        (lsp-eldoc-enable-hover nil)
-        (lsp-enable-completion-at-point t)
-        (lsp-enable-file-watchers t)
-        (lsp-file-watch-threshold 10000)
-        (lsp-keep-workspace-alive nil)
-        (lsp-log-io t)
-        (lsp-prefer-flymake nil)
-      )
+      (use-package lsp-mode
+        :init
+        ;; Performace tuning
+        ;; @see https://emacs-lsp.github.io/lsp-mode/page/performance/
+        ;(setq read-process-output-max (* 1024 1024)) ;; 1MB
+        (setq read-process-output-max 4194304) ;; 4MB
+        ;(setenv "LSP_USE_PLISTS" "true")
+        :commands (lsp lsp-deferred)
+        :hook ((lsp-mode . lsp-enable-which-key-integration)
+               ;(elixir-mode . lsp-deferred)
+               (lsp-mode . (lambda () (add-to-list 'xref-backend-functions #'dumb-jump-xref-activate t)))
+               )
+        :config
+          (with-eval-after-load 'lsp-mode
+            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.direnv\\'")
+            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.git\\'")
+            (remove-hook 'xref-backend-functions 't)
+            (add-hook 'xref-backend-functions #'dumb-jump-xref-activate 0)
+
+            ;; DANGER: dumb-jump-xref-activate as a backend after
+            ;; lsp--xref-backend won't complain if git-grep is left as
+            ;; the default searcher. However, if setting ripgrep as
+            ;; the preferred for everything except for git with (setq
+            ;; dumb-jump-prefer-searcher 'rg) it repeatedly raises:
+            ;; Blocking call to accept-process-output with quit inhibited!!
+            ;(add-hook 'xref-backend-functions #'lsp--xref-backend 0)
+            )
+        :custom
+          ;(lsp-use-plists t) ;; only use with LSP_USE_PLISTS
+          ;(xref-search-program 'ripgrep)
+          (lsp-keymap-prefix "C-c l")
+          (lsp-auto-configure t)
+          (lsp-auto-guess-root t)
+          (lsp-eldoc-enable-hover nil)
+          (lsp-enable-completion-at-point t)
+          (lsp-enable-file-watchers t)
+          (lsp-file-watch-threshold 10000)
+          (lsp-keep-workspace-alive nil)
+          (lsp-log-io nil) ;; enable for debugging
+          (lsp-prefer-flymake nil)
+          (lsp-enable-xref nil) ;; needed to allow customization of backends
+          (lsp-prefer-capf t)
+        )
+    #+END_SRC
+
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package lsp-mode
+        :init
+        ;; Performace tuning
+        ;; @see https://emacs-lsp.github.io/lsp-mode/page/performance/
+        ;(setq read-process-output-max (* 1024 1024)) ;; 1MB
+        (setq read-process-output-max 4194304) ;; 4MB
+        ;(setenv "LSP_USE_PLISTS" "true")
+        :commands (lsp lsp-deferred)
+        :hook
+          ((lsp-mode . lsp-enable-which-key-integration)
+           (lsp-mode . lsp-headerline-breadcrumb-mode))
+        :config
+          (with-eval-after-load 'lsp-mode
+            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.direnv\\'")
+            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.git\\'")
+            )
+        :custom
+          ;(lsp-use-plists t)
+          (xref-search-program 'ripgrep)
+          (lsp-keymap-prefix "C-c l")
+          (lsp-auto-configure t)
+          (lsp-auto-guess-root t)
+          ;(lsp-eldoc-enable-hover nil)
+          ;(lsp-enable-completion-at-point t)
+          (lsp-enable-file-watchers t)
+          ;(lsp-enable-on-type-formatting nil)
+          (lsp-file-watch-threshold 10000)
+          ;(lsp-keep-workspace-alive nil)
+          (lsp-log-io t)
+          ;(lsp-prefer-flymake nil)
+          (lsp-prefer-capf t)
+          (lsp-enable-xref t)
+          ;(lsp-headerline-breadcrumb-enable t)
+          ;(lsp-headerline-breadcrumb-enable-diagnostics t)
+          ;(lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
+          ;(lsp-completion-provider :none)
+        )
+    #+END_SRC
+
+**** Add useful UI features
+
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package lsp-ui
+         :after lsp-mode
+         :commands lsp-ui-mode
+         :general
+          (:keymaps 'lsp-ui-mode-map
+            [remap xref-find-definitions] 'lsp-ui-peek-find-definitions
+            [remap xref-find-references] 'lsp-ui-peek-find-references))
+     #+END_SRC
+
+*** Debug Adapter Protocol [DISABLED]
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package dap-mode)
     #+END_SRC
 
 *** Tree-Sitter
@@ -1760,6 +2469,7 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
         (tree-sitter-after-on-hook . tree-sitter-hl-mode)
         )
     #+END_SRC
+
 *** Flycheck
 
     Flycheck is a modern on-the-fly syntax checking extension for
@@ -1771,15 +2481,14 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package flycheck
       :hook (emacs-startup . global-flycheck-mode)
-      :general ("C-c !" '(:ignore t :which-key "Flymake")) ;; rename +prefix
+      :general ("C-c !" '(:ignore t :which-key "FlyCheck")) ;; rename +prefix
       )
     #+END_SRC
 
 **** Integrate with =Consult=
 
      #+BEGIN_SRC emacs-lisp :tangle yes
-       (use-package consult-flycheck
-         :requires flycheck)
+       (use-package consult-flycheck)
      #+END_SRC
 
 **** Change the modeline color to indicate errors using =flycheck-color-mode-line=
@@ -1789,9 +2498,16 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package flycheck-color-mode-line
-         :requires (flycheck)
          :hook (flycheck-mode . flycheck-color-mode-line-mode))
      #+END_SRC
+
+**** Show flycheck messages inline
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package flycheck-inline
+         :hook (flycheck-mode . flycheck-inline-mode))
+     #+END_SRC
+
 *** More intelligent fill with =prog-fill=
 
     =prog-fill= brings the =M-q= keybinding to programming modes,
@@ -1804,35 +2520,142 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 
 *** Languages
 **** Elixir
+***** Add elixir mode
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (use-package elixir-mode
+          :mode "\\.exs?\\'"
+          :hook ((elixir-mode . prettify-symbols-mode)
+                 (elixir-mode . lsp-deferred)
+                 (elixir-mode . (lambda () (projectile-register-project-type 'elixir '("mix.exs")
+                                  :compile "mix deps.get"
+                                  :test "mix test --no-color"
+                                  :run "mix app.start"
+                                  :src-dir "lib"
+                                  :test-dir "test"
+                                  :test-suffix "_test"
+                                  :related-files-fn 'phx/related-files)
 
-     #+BEGIN_SRC emacs-lisp :tangle yes
-       (use-package elixir-mode
-         :after lsp
-         :mode "\\.exs?\\'"
-         :hook
-         ((elixir . lsp-deferred)
-          (before-save .(lambda () (when (eq major-mode 'elixir-mode)
-                                     (ignore-errors 'lsp-format-buffer))))
-          (elixir . elixir-mode-prettify-symbols-hook)
+                                  )))
+          :init
+          (add-to-list 'exec-path "~/Projects/elixir/elixir-ls/release")
+          (defun phx/related-files (path)
+            (let* ((filename (file-name-nondirectory path))
+                   (files (projectile-project-files (projectile-project-root))))
+              (when (string-match (rx (group (+ alpha)) "_") filename)
+                (let ((prefix (match-string 1 filename)))
+                  (list :templates (cl-remove-if-not
+                                    (lambda (file)
+                                      (string-match (concat "templates/" prefix) file))
+                                    files))))))
+          :config
+          (with-eval-after-load 'lsp
+            (dolist (dir '("build$" "deps$"))
+              (push (concat "[/\\\\]" dir) lsp-file-watch-ignored)))
+            (setq-local paragraph-start
+              (rx (or (group (* whitespace) num "." (* any) eol)
+                      (group (* whitespace) eol))))
+            (setq-local paragraph-separate
+              (rx (or (group (* any) "\"\"\"" (* whitespace) eol)
+                      (group (* whitespace) eol))))
+            (with-eval-after-load 'lsp-mode
+              (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]build\\'")
+              (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]deps\\'")
+              )
+
+          :custom
+          (lsp-elixir-suggest-specs t)
+          (lsp-elixir-enable-test-lenses t)
+
+          :general
+            (:keymaps 'elixir-mode-map
+             "M-q" 'elixir-mode-fill-doc-string)
           )
-         :config
-         (add-to-list 'exec-path "~/Projects/elixir/elixir-ls/release")
-         ;(dolist (dir '("build$" "deps$"))
-         ;  (push (concat "[/\\\\]" dir) lsp-file-watch-ignored))
-         (setq-local
-          prettify-symbols-alist
-          (append
-           '(("->" . ?→)
-             ("=>" . ?⇒)
-             ("<-" . ?←)
-             ("<=" . ?⇐)
-             (">=" . ?≥)
-             ("=<" . ?≤)
-             ("!=" . ?≠)
-             ("fn" . ?ƒ))
-           prettify-symbols-alist))
-         )
-     #+END_SRC
+      #+END_SRC
+
+      #+BEGIN_SRC emacs-lisp :tangle no
+        (use-package elixir-mode
+          :mode "\\.exs?\\'"
+          :hook ((elixir-mode . prettify-symbols-mode)
+                 (elixir-mode . lsp-deferred)
+                 (elixir-mode . (lambda () (projectile-register-project-type 'elixir '("mix.exs")
+                                  :compile "mix deps.get"
+                                  :test "mix test --no-color"
+                                  :run "mix app.start"
+                                  :src-dir "lib"
+                                  :test-dir "test"
+                                  :test-suffix "_test"
+                                  :related-files-fn 'phx/related-files)
+
+                                  )))
+          ;((elixir-mode . lsp-deferred)
+           ;(before-save .(lambda () (when (eq major-mode 'elixir-mode)
+           ;                           (ignore-errors 'lsp-format-buffer))))
+           ;(elixir-mode . elixir-mode-prettify-symbols-hook)
+           ;)
+          :init
+          (add-hook 'xref-backend-functions #'lsp--xref-backend nil t)
+          (add-to-list 'exec-path "~/Projects/elixir/elixir-ls/release")
+          (defun phx/related-files (path)
+            (let* ((filename (file-name-nondirectory path))
+                   (files (projectile-project-files (projectile-project-root))))
+              (when (string-match (rx (group (+ alpha)) "_") filename)
+                (let ((prefix (match-string 1 filename)))
+                  (list :templates (cl-remove-if-not
+                                    (lambda (file)
+                                      (string-match (concat "templates/" prefix) file))
+                                    files))))))
+          :config
+          (with-eval-after-load 'lsp
+            (dolist (dir '("build$" "deps$"))
+              (push (concat "[/\\\\]" dir) lsp-file-watch-ignored)))
+            (setq-local paragraph-start
+              (rx (or (group (* whitespace) num "." (* any) eol)
+                      (group (* whitespace) eol))))
+            (setq-local paragraph-separate
+              (rx (or (group (* any) "\"\"\"" (* whitespace) eol)
+                      (group (* whitespace) eol))))
+            (with-eval-after-load 'lsp-mode
+              (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]build\\'")
+              (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]deps\\'")
+              )
+          :custom
+          (lsp-elixir-suggest-specs t)
+          ;(lsp-lens-enable t)
+          )
+      #+END_SRC
+
+          :config
+          (defun er/add-elixir-mode-expansions ()
+            (make-variable-buffer-local 'er/try-expand-list)
+            (setq er--python-block-start-regex
+                  (rx symbol-start
+                      (or "def" "do" "if" "else"
+                          "try" "except" "catch" "rescue" "finally"
+                          "for" "while" "with"
+                          "test" "describe")
+                      symbol-end))
+            (setq er/try-expand-list '(er/mark-subword
+                                       er/mark-word
+                                       er/mark-inside-python-string
+                                       er/mark-outside-python-string
+                                       er/mark-python-statement
+                                       er/mark-python-block)
+                                      ))
+          (with-eval-after-load 'expand-region
+            (er/enable-mode-expansions 'elixir-mode 'er/add-elixir-mode-expansions))
+
+***** Add mix as a minor mode
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (use-package mix
+          :config
+          (add-hook 'elixir-mode-hook 'mix-minor-mode))
+      #+END_SRC
+***** Add =ruby-end-mode= to auto-insert =end= for blocks
+
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (use-package ruby-end
+          :hook (elixir-mode . ruby-end-mode))
+      #+END_SRC
 
 ***** Add support for =.(l|h)eex= files
 
@@ -1842,11 +2665,26 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
       (add-to-list 'auto-mode-alist '("\\.(l|h)?eex\\'" . web-mode))
       #+END_SRC
 
+***** Add function to insert/remove breakpoint
+
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (defun my/elixir-toggle-breakpoint ()
+          "Add a breakpoint line or clear it if line is already a breakpoint."
+          (interactive)
+          (let ((trace "require IEx; IEx.pry")
+                (line (thing-at-point 'line)))
+            (if (and line (string-match trace line))
+                (kill-whole-line)
+              (progn
+                (back-to-indentation)
+                (insert trace)
+                (newline-and-indent)))))
+      #+END_SRC
+
 ***** Add =flycheck-credo=
 
       #+BEGIN_SRC emacs-lisp :tangle yes
         (use-package flycheck-credo
-          :requires (flycheck lsp elixir)
           :config
           (flycheck-credo-setup)
           :custom
@@ -1856,7 +2694,6 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
 ***** Add =exunit= for test running
       #+BEGIN_SRC emacs-lisp :tangle yes
         (use-package exunit
-          :requires (elixir)
           :hook (elixir-mode . exunit-mode))
       #+END_SRC
 
@@ -1869,17 +2706,113 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
           :keymaps 'elixir-mode-map
           :prefix "C-c C-e"
           "" '(nil :which-key "Elixir")
-          "t" '(exunit-verify-all :which-key "test project")
-          "b" '(exunit-verify :which-key "test buffer")
-          "u" '(exunit-verify-all-in-umbrella :which-key "test umbrella")
-          "." '(exunit-verify-single :which-key "test at point")
-          "r" '(exunit-rerun :which-key "rerun last")
-          "F" '(xref-find-definitions :which-key "defs (here)")
-          "f" '(xref-find-definitions-other-window :which-key "defs (other window)")
-          "d" '(elixir-find-definition :which-key "jump to def")
+          "t" '(exunit-transient :which-key "test")
+          "i" '(exunit-toggle-file-and-test :which-key "toggle file/test")
+          "I" '(exunit-toggle-file-and-test-other-window :which-key "↗ toggle file/test")
+          "X" '(xref-find-definitions :which-key "xref defs")
+          "x" '(xref-find-definitions-other-window :which-key "↗ xref defs")
+          "j" '(dumb-jump-go :which-key "dumb-jump to def")
+          "J" '(dumb-jump-go-other-window :which-key "↗ dumb-jump to def")
+          "f" '(elixir-format :which-key "format")
+          "p" '(my/elixir-toggle-breakpoint :which-key "toggle pry")
+          "d" '(elixir-mode-fill-doc-string :which-key "fill docstring")
+          "!" '(mix-minor-mode-command-map :which-key "run mix mask")
           )
       #+END_SRC
 
+***** Add some useful shortcuts
+
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (defun my/elixir-insert-pipe ()
+          (interactive)
+          (princ "\n" (current-buffer))
+          (princ "|> " (current-buffer))
+          (indent-according-to-mode))
+
+        (general-define-key
+         :keymaps 'elixir-mode-map
+         "M-<return>" 'my/elixir-insert-pipe)
+
+        (defun my/toggle-ex-leex ()
+          (interactive)
+          (cond
+           ((string-suffix-p ".ex" (buffer-file-name))
+            (find-file (string-replace ".ex" ".html.leex" (buffer-file-name))))
+           ((string-suffix-p ".html.leex" (buffer-file-name))
+            (let ((sym (thing-at-point 'symbol)))
+              (find-file (string-replace ".html.leex" ".ex" (buffer-file-name)))
+              (when sym
+                (let (pos)
+                  (save-mark-and-excursion
+                    (goto-char (point-min))
+                    (setq pos (re-search-forward (format "\"%s\"" (regexp-quote sym)) nil t)))
+                  (when pos (goto-char pos) (recenter))))))
+           (t
+            (error "File extension is neither .ex nor .html.leex"))))
+
+        (defun my/toggle-ex-heex ()
+          (interactive)
+          (cond
+           ((string-suffix-p ".ex" (buffer-file-name))
+            (find-file (string-replace ".ex" ".html.heex" (buffer-file-name))))
+           ((string-suffix-p ".html.heex" (buffer-file-name))
+            (let ((sym (thing-at-point 'symbol)))
+              (find-file (string-replace ".html.heex" ".ex" (buffer-file-name)))
+              (when sym
+                (let (pos)
+                  (save-mark-and-excursion
+                    (goto-char (point-min))
+                    (setq pos (re-search-forward (format "\"%s\"" (regexp-quote sym)) nil t)))
+                  (when pos (goto-char pos) (recenter))))))
+           (t
+            (error "File extension is neither .ex nor .html.heex"))))
+
+        (defun my/elixir-map-atom-to-map-string (&optional begin end)
+          "Transform Elixir map atom to map string. Use BEGIN and END as region."
+          (interactive "r")
+          (save-excursion
+            (let ((min (if (region-active-p) begin (point-min))))
+              (goto-char min)
+              (while (re-search-forward "\\([a-zA-z0-9]+\\): " end t)
+                (replace-match "\"\\1\" => "))
+              (goto-char min))))
+
+        (defun my/elixir-map-string-to-map-atom (&optional begin end)
+          "Transform Elixir map string to map atom. Use BEGIN and END as region."
+          (interactive "r")
+          (save-excursion
+            (let ((min (if (region-active-p) begin (point-min))))
+              (goto-char min)
+              (while (re-search-forward "\"\\([a-zA-z0-9]+\\)\" => " end t)
+                (replace-match "\\1: "))
+              (goto-char min))))
+
+        (general-define-key
+          :keymaps 'elixir-mode-map
+          :prefix "C-c C-e"
+          "l" '(my/toggle-ex-leex :which-key "toggle ex/leex")
+          "h" '(my/toggle-ex-heex :which-key "toggle ex/heex")
+          "m" '(my/elixir-map-string-to-map-atom :which-key "map: => to kw")
+          "M" '(my/elixir-map-atom-to-map-string :which-key "map: kw to =>")
+          )
+      #+END_SRC
+
+
+***** Fix-up how Projectile handles test/implementation toggling
+
+      For Elixir we should jump to =*_test.exs= (with an =s= suffix)
+      instead of =*_test.ex=
+
+      #+BEGIN_SRC emacs-lisp :tangle yes
+        (defun my/fix-exs-test-file-name (name)
+          (cond
+           ((string-suffix-p "_test.ex" name) (concat name "s"))
+           (t name)))
+
+        (advice-add #'projectile--test-name-for-impl-name
+                    :filter-return
+                    #'my/fix-exs-test-file-name)
+      #+END_SRC
 **** HTML et al
 
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1919,6 +2852,96 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
          (js-switch-indent-offset 4))
      #+END_SRC
 
+***** TypeScript
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package typescript-mode
+         :hook
+         ((typescript-mode . tide-hl-identifier-mode)
+          (typescript-mode . lsp))
+         :mode (("\\.tsx\\'" . typescript-mode)
+                ("\\.ts\\'" . typescript-mode))
+         :custom
+         (typescript-indent-level 2)
+         )
+     #+END_SRC
+
+***** Tide
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package tide
+         :hook ((before-save . tide-format-before-save)
+                (web-mode . (lambda() (tide-setup) (eldoc-mode)))
+                (typescript-mode . (lambda() (tide-setup) (eldoc-mode)))
+                (rjsx-mode . (lambda() (tide-setup) (eldoc-mode)))
+                )
+         :custom
+         (tide-format-options '(:insertSpaceAfterFunctionKeywordForAnonymousFunctions t)))
+     #+END_SRC
+
+***** Vue
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package vue-mode
+         :hook (vue-mode . lsp)
+         :mode
+         "\\.vue\\'"
+         )
+     #+END_SRC
+
+**** Crystal
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package crystal-mode
+        :hook
+        ((crystal-mode . ruby-block-mode)
+         (crystal-mode . ruby-end-mode))
+        :mode
+        "\\.cr\\'")
+     #+END_SRC
+***** Add flycheck
+     #+BEGIN_SRC emacs-lisp :tangle no
+       (use-package flycheck-crystal
+         :after (flycheck crystal-mode))
+     #+END_SRC
+**** Nim
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package nim-mode
+        :mode
+        "\\.nim\\'")
+     #+END_SRC
+**** Rust
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package rust-mode
+        :custom
+        (rust-format-on-save t)
+        :hook (lsp)
+        :mode
+        "\\.rs\\'")
+      (use-package flycheck-rust
+        :after flycheck
+        :hook (flycheck-rust-setup))
+      (use-package rust-auto-use
+        :after rust-mode)
+     #+END_SRC
+      (use-package cargo-transient
+        :custom
+        (cargo-transient-buffer-name-function '#project-prefixed-buffer-name))
+***** Rust Object Notation
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package ron-mode
+         :mode
+         "\\.ron\\'")
+      #+END_SRC
+**** GraphQL
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package graphql-mode
+         :mode (("\\.graphql$" . graphql-mode)
+                ("\\.graphqls$" . graphql-mode)
+                ("\\.gql$" . graphql-mode))
+         )
+     #+END_SRC
+
 **** Sass/Scss
 
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1926,7 +2949,6 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
          :mode
          "\\.s(c|a)ss\\'")
      #+END_SRC
-
 **** Yaml
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -1959,7 +2981,32 @@ https://github.com/Wilfred/emacs-refactor#user-content-extension
          "\\Dockerfile\\'")
      #+END_SRC
 
+**** Features/Gherkin
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package feature-mode
+         :mode
+         "\\.feature\\'")
+     #+END_SRC
+
 ** Finalising
+*** Add profiler to diagnose start-up issues
+    Doesn't seem to be working well with Emacs 29
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package esup)
+    #+END_SRC
+*** Normalize GC
+    #+begin_src emacs-lisp :tangle yes
+      ;; (setq garbage-collection-messages t) ; for debug
+      (defun my/cleanup-gc ()
+        "Clean up gc."
+        (setq gc-cons-threshold  134217728) ; 128M
+        (setq gc-cons-percentage 0.1) ; original value
+        (garbage-collect))
+
+      (run-with-idle-timer 4 nil #'my/cleanup-gc)
+    #+end_src
+*** "Provide" the generated file.
     #+begin_src emacs-lisp :tangle yes
       (provide 'init)
     #+end_src

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm README.el
+rm -Rf eln-cache
+rm -Rf var/eln-cache
+rm -Rf var/straight

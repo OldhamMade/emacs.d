@@ -39,6 +39,7 @@
 ;; Keep the base directory tidy
 (use-package no-littering
   :ensure t
+  :demand t
   :config
   (setq auto-save-file-name-transforms
     `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
@@ -52,12 +53,6 @@
               recentf-max-saved-items 100))))
   (eval-when-compile
     (require 'recentf)))
-
-;; Introduce =add-hooks= functions to simplify multiple hook declarations
-;; into single declarative calls.
-(use-package add-hooks
-  :demand t)
-
 
 ;;; Bootstrap
 

@@ -9,6 +9,7 @@
 ;; threshold to temporarily prevent it from running, then reset it later by
 ;; enabling `gcmh-mode'. Not resetting it will cause stuttering/freezes.
 (setq gc-cons-threshold most-positive-fixnum)
+(setq gc-cons-percentage 0.6)
 
 ;; Prevent unwanted runtime compilation for gccemacs (native-comp) users;
 ;; packages are compiled ahead-of-time when they are installed and site files
@@ -24,13 +25,6 @@
 ;; prevent the use of stale byte-code. Otherwise, it saves us a little IO time
 ;; to skip the mtime checks on every *.elc file.
 (setq load-prefer-newer noninteractive)
-
-;; Change the default location of natively-compiled Files
-;; to align with the no-littering package
-(when (fboundp 'startup-redirect-eln-cache)
-  (startup-redirect-eln-cache
-   (convert-standard-filename
-     (expand-file-name  "var/eln-cache/" user-emacs-directory))))
 
 (unless (or (daemonp)
             noninteractive
@@ -68,6 +62,12 @@
   (when (fboundp 'native-comp-available-p)
       (progn
         (require 'comp)
+        ;; Change the default location of natively-compiled Files
+        ;; to align with the no-littering package
+        (when (fboundp 'startup-redirect-eln-cache)
+          (startup-redirect-eln-cache
+           (convert-standard-filename
+             (expand-file-name  "var/eln-cache/" user-emacs-directory))))
         (setq package-native-compile t)
         (setq native-comp-deferred-compilation t)
         (setq native-comp-compiler-options '("-O2" "-mtune=native"))
@@ -104,6 +104,8 @@
       ;; middle-click paste at point, not at click
       mouse-yank-at-point t
       read-process-output-max (* 1024 1024) ;; 1mb
+      ;; disable annoying "thing got redefined" errors
+      ad-redefinition-action 'accept
       )
 
 ;; Avoid to show a message about deprecation of cl package
