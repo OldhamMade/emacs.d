@@ -486,7 +486,8 @@ exactly that (like what deadgrep does).
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package ace-window
         :general
-          ("M-o" 'ace-window)
+          ("M-o" 'ace-window
+           "M-<tab>" 'ace-window)
         :custom
           (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
           (ace-window-display-mode t)
@@ -1011,7 +1012,8 @@ exactly that (like what deadgrep does).
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package avy
         :general
-        ("C-'" 'avy-goto-char-timer))
+        ("C-'" 'avy-goto-char-timer
+         "C-=" 'avy-goto-char-timer))
     #+END_SRC
 
 *** Pulse the active line after movement commands
@@ -1921,6 +1923,15 @@ exactly that (like what deadgrep does).
         (shell-file-name "/bin/zsh"))
     #+end_src
 
+    #+begin_src emacs-lisp :tangle yes
+      (use-package eat
+        :straight (eat :type git :host github :repo "kephale/emacs-eat")
+        :custom
+          (eat-kill-buffer-on-exit t)
+          (shell-file-name "/bin/zsh")
+          )
+    #+end_src
+
 ** Tramp
 
     TRAMP mode is excellent for editing files on a remote machine or
@@ -1956,6 +1967,7 @@ exactly that (like what deadgrep does).
     #+begin_src emacs-lisp :tangle yes
       (use-package magit
         :general ("C-x g" 'magit-status)
+        :hook (magit-add-section . magit-insert-tracked-files)
         :custom
           (magit-branch-arguments nil)
           (magit-branch-read-upstream-first 'fallback)
@@ -2372,11 +2384,11 @@ exactly that (like what deadgrep does).
             ;; the preferred for everything except for git with (setq
             ;; dumb-jump-prefer-searcher 'rg) it repeatedly raises:
             ;; Blocking call to accept-process-output with quit inhibited!!
-            ;(add-hook 'xref-backend-functions #'lsp--xref-backend 0)
+            (add-hook 'xref-backend-functions #'lsp--xref-backend 0)
             )
         :custom
           ;(lsp-use-plists t) ;; only use with LSP_USE_PLISTS
-          ;(xref-search-program 'ripgrep)
+          (xref-search-program 'ripgrep)
           (lsp-keymap-prefix "C-c l")
           (lsp-auto-configure t)
           (lsp-auto-guess-root t)
@@ -2388,6 +2400,7 @@ exactly that (like what deadgrep does).
           (lsp-log-io nil) ;; enable for debugging
           (lsp-prefer-flymake nil)
           (lsp-enable-xref nil) ;; needed to allow customization of backends
+          ;(lsp-enable-xref t)
           (lsp-prefer-capf t)
         )
     #+END_SRC

@@ -14,7 +14,7 @@
 ;; Prevent unwanted runtime compilation for gccemacs (native-comp) users;
 ;; packages are compiled ahead-of-time when they are installed and site files
 ;; are compiled when gccemacs is installed.
-(setq native-comp-deferred-compilation nil)
+(setq native-comp-jit-compilation nil)
 
 ;; In Emacs 27+, package initialization occurs before `user-init-file' is
 ;; loaded, but after `early-init-file'. We handle package initialization
@@ -57,7 +57,7 @@
                             inhibit-message nil)
               (redisplay)))
 
-  (setenv "LIBRARY_PATH" "/usr/local/opt/gcc/lib/gcc/11:/usr/local/opt/libgccjit/lib/gcc/11:/usr/local/opt/gcc/lib/gcc/11/gcc/x86_64-apple-darwin21/11")
+  (setenv "LIBRARY_PATH" "/usr/local/opt/gcc/lib/gcc/current:/usr/local/opt/libgccjit/lib/gcc/current:/usr/local/opt/gcc/lib/gcc/current/gcc/x86_64-apple-darwin22/13")
 
   (when (fboundp 'native-comp-available-p)
       (progn
@@ -69,8 +69,8 @@
            (convert-standard-filename
              (expand-file-name  "var/eln-cache/" user-emacs-directory))))
         (setq package-native-compile t)
-        (setq native-comp-deferred-compilation t)
-        (setq native-comp-compiler-options '("-O2" "-mtune=native"))
+        (setq native-comp-jit-compilation t)
+        ;(setq native-comp-compiler-options '("-O2" "-mtune=native"))
         (custom-set-variables
          '(native-comp-async-report-warnings-errors 'silent))
         ))
