@@ -57,23 +57,24 @@
                             inhibit-message nil)
               (redisplay)))
 
-  (setenv "LIBRARY_PATH" "/usr/local/opt/gcc/lib/gcc/current:/usr/local/opt/libgccjit/lib/gcc/current:/usr/local/opt/gcc/lib/gcc/current/gcc/x86_64-apple-darwin22/13")
+  ;; (setenv "LIBRARY_PATH" "/usr/local/opt/gcc/lib/gcc/current:/usr/local/opt/libgccjit/lib/gcc/current:/usr/local/opt/gcc/lib/gcc/current/gcc/x86_64-apple-darwin22/13:/opt/homebrew/opt/gcc/lib/gcc/current/gcc/aarch64-apple-darwin22/13")
+  (setenv "LIBRARY_PATH" "/usr/local/opt/gcc/lib/gcc/current:/usr/local/opt/libgccjit/lib/gcc/current:/usr/local/opt/gcc/lib/gcc/current/gcc/x86_64-apple-darwin22/13:/opt/homebrew/opt/gcc/lib/gcc/current/gcc/aarch64-apple-darwin23/14")
 
   (when (fboundp 'native-comp-available-p)
-      (progn
-        (require 'comp)
-        ;; Change the default location of natively-compiled Files
-        ;; to align with the no-littering package
-        (when (fboundp 'startup-redirect-eln-cache)
-          (startup-redirect-eln-cache
-           (convert-standard-filename
-             (expand-file-name  "var/eln-cache/" user-emacs-directory))))
-        (setq package-native-compile t)
-        (setq native-comp-jit-compilation t)
-        ;(setq native-comp-compiler-options '("-O2" "-mtune=native"))
-        (custom-set-variables
-         '(native-comp-async-report-warnings-errors 'silent))
-        ))
+    (progn
+      (require 'comp)
+      ;; Change the default location of natively-compiled Files
+      ;; to align with the no-littering package
+      (when (fboundp 'startup-redirect-eln-cache)
+        (startup-redirect-eln-cache
+         (convert-standard-filename
+          (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+      (setq package-native-compile t)
+      (setq native-comp-jit-compilation t)
+      (setq native-comp-compiler-options '("-O2")) ;; "-mtune=native"))
+      (custom-set-variables
+       '(native-comp-async-report-warnings-errors 'silent))
+      ))
 
   ;; Site files tend to use `load-file', which emits "Loading X..." messages in
   ;; the echo area, which in turn triggers a redisplay. Redisplays can have a
@@ -128,12 +129,12 @@
 ;; that sets variables at a time where it can be easily and unpredictably
 ;; overwritten. Configure things from README.org instead.
 (dolist (sym '(customize-option customize-browse customize-group customize-face
-               customize-rogue customize-saved customize-apropos
-               customize-changed customize-unsaved customize-variable
-               customize-set-value customize-customized customize-set-variable
-               customize-apropos-faces customize-save-variable
-               customize-apropos-groups customize-apropos-options
-               customize-changed-options customize-save-customized))
+                                customize-rogue customize-saved customize-apropos
+                                customize-changed customize-unsaved customize-variable
+                                customize-set-value customize-customized customize-set-variable
+                                customize-apropos-faces customize-save-variable
+                                customize-apropos-groups customize-apropos-options
+                                customize-changed-options customize-save-customized))
   (put sym 'disabled "Do not use `customize', configure Emacs from README.org instead"))
 (put 'customize-themes 'disabled "Use `load-theme' in README.org instead")
 
@@ -271,7 +272,7 @@
 
 ;; Set the preferred default font early
 (add-to-list 'default-frame-alist
-             '(font . "SFMono Nerd Font:pixelsize=10:weight=normal:slant=normal:width=normal:spacing=100:scalable=true:hinting=true"))
+             '(font . "SF Mono Powerline:pixelsize=10:weight=normal:slant=normal:width=normal:spacing=100:scalable=true:hinting=true"))
 
 ;; Disable italics because they can be hard to read
 (set-face-italic-p 'italic nil)

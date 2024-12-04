@@ -34,6 +34,24 @@ exactly that (like what deadgrep does).
      ;; -*- lexical-binding: t; -*-
    #+END_SRC
 
+*** Package updates
+
+   A small function to wrap the process of updating and upgrading all
+   installed packages.
+
+   #+BEGIN_SRC emacs-lisp :tangle yes
+     (defun upgrade-all-straight-packages ()
+       "Pull and rebuild all straight.el packages."
+       (interactive)
+       (message "straight.el: pulling package updates")
+       (straight-pull-all)
+       (message "straight.el: rebuilding packages")
+       (straight-rebuild-all)
+       (message "straight.el: package updates have been applied")
+       )
+   #+END_SRC
+
+
 *** Don't GC during startup to save time
     #+BEGIN_SRC emacs-lisp :tangle yes
       (setq gc-cons-percentage 0.6)
@@ -193,7 +211,7 @@ exactly that (like what deadgrep does).
        ;; save
        "H-s" 'save-buffer
        ;;  close
-       "H-w" 'kill-this-buffer
+       "H-w" 'kill-current-buffer
        ;; quit
        "H-q" 'save-buffers-kill-emacs
        ;; minimise
@@ -252,6 +270,17 @@ exactly that (like what deadgrep does).
     #+BEGIN_SRC emacs-lisp :tangle yes
       (setq save-interprogram-paste-before-kill t)
     #+END_SRC
+**** Ensure we can copy current file's path to clipboard
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (defun copy-file-path-to-clipboard ()
+        "Copy the current buffer's file path to the clipboard."
+        (interactive)
+        (if buffer-file-name
+            (progn
+              (kill-new buffer-file-name)
+              (message "Copied buffer file path: %s" buffer-file-name))
+          (message "Buffer is not visiting a file!")))
+    #+END_SRC
 *** Set a flag for external tools
 
     It can be useful for other tools to know when they're running from
@@ -268,9 +297,17 @@ exactly that (like what deadgrep does).
       (use-package exec-path-from-shell
         :if (memq window-system '(mac ns))
         :demand t
-        :hook (after-init . exec-path-from-shell-initialize)
+        ;:hook
+        ;  (after-init . exec-path-from-shell-initialize)
         :custom
-        (exec-path-from-shell-arguments '("-l")))
+          (exec-path-from-shell-arguments '("-l"))
+        :config
+          (exec-path-from-shell-initialize)
+          (exec-path-from-shell-copy-env "PYENV_VERSION")
+          (exec-path-from-shell-copy-env "ASDF_DIR")
+          (exec-path-from-shell-copy-env "VIRTUAL_ENV")
+          (exec-path-from-shell-copy-env "PATH")
+          )
     #+END_SRC
 
 *** =executable-prefix-env=
@@ -339,6 +376,14 @@ exactly that (like what deadgrep does).
                    "C-c E" '(envrc-command-map :which-key "envrc")))
      #+END_SRC
 
+
+**** Inherit environment in temp buffers
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package inheritenv
+         :after (envrc))
+     #+END_SRC
+
 ** Theme
 
     Use a theme with a dark background and good contrast.
@@ -348,8 +393,7 @@ exactly that (like what deadgrep does).
         :demand t
         :straight (leiptr :type git :host github :repo "OldhamMade/leiptr-theme")
         :config
-          (load-theme 'leiptr t)
-          )
+          (load-theme 'leiptr t))
     #+END_SRC
 
 ** Help
@@ -1253,12 +1297,15 @@ exactly that (like what deadgrep does).
 
      https://github.com/gagbo/consult-lsp
 
-     Seems to break xref-find-definition, so disabled for now.
+     # Seems to break xref-find-definition, so disabled for now.
 
-     #+BEGIN_SRC emacs-lisp :tangle no
+     #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package consult-lsp
          :config
-         (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols))
+         (define-key lsp-mode-map [remap xref-find-apropos] #'consult-lsp-symbols)
+         (define-key lsp-mode-map [remap lsp-treemacs-errors-list] #'consult-lsp-diagnostics)
+
+         )
      #+END_SRC
 
 *** Contextual commands care of =Embark=
@@ -1918,12 +1965,6 @@ exactly that (like what deadgrep does).
 ** Term
 
     #+begin_src emacs-lisp :tangle yes
-      (use-package vterm
-        :custom
-        (shell-file-name "/bin/zsh"))
-    #+end_src
-
-    #+begin_src emacs-lisp :tangle yes
       (use-package eat
         :straight (eat :type git :host github :repo "kephale/emacs-eat")
         :custom
@@ -1994,8 +2035,6 @@ exactly that (like what deadgrep does).
              ("Path"    99 magit-repolist-column-path ())))
           (magit-repository-directories
            `(
-             ("~/Clients/flexibility" . 2)
-             ("~/Clients/tgu" . 2)
              ("~/Projects" . 2)
              ))
         :config
@@ -2003,6 +2042,21 @@ exactly that (like what deadgrep does).
             '("A" "Autostash" "--autostash"))
         )
     #+end_src
+
+**** Display the project name in the header of the status window
+
+    #+begin_src emacs-lisp :tangle yes
+      (defun my/magit-status-header ()
+        (let ((project-name (or (projectile-project-name) (file-name-nondirectory (directory-file-name default-directory)))))
+          (concat "Project: " project-name "\n")))
+
+      (advice-add 'magit-status-setup-buffer :after
+                  (lambda (&rest _)
+                    (let ((inhibit-read-only t))
+                      (goto-char (point-min))
+                      (insert (my/magit-status-header)))))
+    #+end_src
+
 
 **** Ensure branch names do not contain whitespace
      When typing a branch name, entering whitespace will cause an annoying
@@ -2100,7 +2154,12 @@ exactly that (like what deadgrep does).
         :general
           (:keymaps 'goto-map
            "r" 'browse-at-remote)
-          )
+        :config
+          (add-to-list 'browse-at-remote-remote-type-regexps
+                       `(:host ,(rx bol "gitlab.ripe.net" eol)
+                         :type "gitlab"
+                         :actual-host "gitlab.ripe.net"))
+      )
     #+END_SRC
 
 *** Follow "Conventional Commits" guidelines
@@ -2110,22 +2169,35 @@ exactly that (like what deadgrep does).
         :hook
         (git-commit-mode . conventional-commit-setup))
     #+END_SRC
+
 *** Projects
 
     #+begin_src emacs-lisp :tangle yes
       (use-package projectile
         :hook (emacs-startup . projectile-mode)
         :general
-        (:keymaps 'global
-         "C-x p" '(:keymap projectile-command-map :package projectile :which-key "Projectile"))
+        (:keymaps 'override
+                  "C-x p" '(:keymap projectile-command-map :package projectile :which-key "Projectile"))
         (:keymaps 'projectile-command-map
-         "A" 'projectile-add-known-project
-         "K" 'projectile-remove-known-project)
+                  "A" 'projectile-add-known-project
+                  "K" 'projectile-remove-known-project)
         :custom
-        (projectile-enable-caching t)
-        ; Show the magit status for a project when first opening it
-        (projectile-switch-project-action 'my/magit-status)
-        )
+        (projectile-indexing-method 'hybrid)
+        (projectile-verbose t)
+        ;; (projectile-enable-caching t)
+                                              ; Show the magit status for a project when first opening it
+        (projectile-switch-project-action 'my/magit-status))
+
+      (defun test-projectile-config ()
+        "Load and print the contents of the .projectile file."
+        (interactive)
+        (let ((projectile-config-file (expand-file-name ".projectile" (projectile-project-root))))
+          (if (file-exists-p projectile-config-file)
+              (with-temp-buffer
+                (insert-file-contents projectile-config-file)
+                (message "Contents of .projectile:\n%s" (buffer-string)))
+            (message "No .projectile file found in project root."))))
+
     #+end_src
 
 **** Custom switch command
@@ -2191,6 +2263,30 @@ exactly that (like what deadgrep does).
                   project-relative-file)))
          )
      #+END_SRC
+
+**** Ensure direnv is reloaded when switching projects
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (defun my/projectile-direnv-hook ()
+         (when (fboundp 'direnv-update-environment)
+           (message "Updating environment with direnv...")
+           (direnv-update-environment)))
+
+       (add-hook 'projectile-after-switch-project-hook 'my/projectile-direnv-hook)
+     #+END_SRC
+
+**** Update exec-path and environment variables when switching projects
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (defun my/projectile-update-exec-path ()
+         (let ((venv (getenv "VIRTUAL_ENV")))
+           (when venv
+             (message "Setting exec-path for VIRTUAL_ENV: %s" venv)
+             (add-to-list 'exec-path (concat venv "/bin")))))
+
+       (add-hook 'projectile-after-switch-project-hook 'my/projectile-update-exec-path)
+     #+END_SRC
+
 
 ** Org
 *** Hide emphasis markers
@@ -2369,9 +2465,23 @@ exactly that (like what deadgrep does).
         :commands (lsp lsp-deferred)
         :hook ((lsp-mode . lsp-enable-which-key-integration)
                ;(elixir-mode . lsp-deferred)
+               (python-mode . lsp-deferred)
                (lsp-mode . (lambda () (add-to-list 'xref-backend-functions #'dumb-jump-xref-activate t)))
                )
         :config
+          (add-to-list 'lsp-language-id-configuration '(python-mode . "python"))
+
+          ;; Use `ruff server` as the command for the Python LSP
+          (lsp-register-client
+           (make-lsp-client
+            :new-connection (lsp-stdio-connection '("ruff" "server"))
+            :major-modes '(python-mode)
+            :server-id 'ruff
+            :initialized-fn (lambda (workspace)
+                              (with-lsp-workspace workspace
+                                (lsp--set-configuration
+                                 (lsp-configuration-section "ruff"))))))
+
           (with-eval-after-load 'lsp-mode
             (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.direnv\\'")
             (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.git\\'")
@@ -2386,6 +2496,7 @@ exactly that (like what deadgrep does).
             ;; Blocking call to accept-process-output with quit inhibited!!
             (add-hook 'xref-backend-functions #'lsp--xref-backend 0)
             )
+
         :custom
           ;(lsp-use-plists t) ;; only use with LSP_USE_PLISTS
           (xref-search-program 'ripgrep)
@@ -2402,47 +2513,13 @@ exactly that (like what deadgrep does).
           (lsp-enable-xref nil) ;; needed to allow customization of backends
           ;(lsp-enable-xref t)
           (lsp-prefer-capf t)
-        )
-    #+END_SRC
-
-
-    #+BEGIN_SRC emacs-lisp :tangle no
-      (use-package lsp-mode
-        :init
-        ;; Performace tuning
-        ;; @see https://emacs-lsp.github.io/lsp-mode/page/performance/
-        ;(setq read-process-output-max (* 1024 1024)) ;; 1MB
-        (setq read-process-output-max 4194304) ;; 4MB
-        ;(setenv "LSP_USE_PLISTS" "true")
-        :commands (lsp lsp-deferred)
-        :hook
-          ((lsp-mode . lsp-enable-which-key-integration)
-           (lsp-mode . lsp-headerline-breadcrumb-mode))
-        :config
-          (with-eval-after-load 'lsp-mode
-            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.direnv\\'")
-            (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.git\\'")
-            )
-        :custom
-          ;(lsp-use-plists t)
-          (xref-search-program 'ripgrep)
-          (lsp-keymap-prefix "C-c l")
-          (lsp-auto-configure t)
-          (lsp-auto-guess-root t)
-          ;(lsp-eldoc-enable-hover nil)
-          ;(lsp-enable-completion-at-point t)
-          (lsp-enable-file-watchers t)
-          ;(lsp-enable-on-type-formatting nil)
-          (lsp-file-watch-threshold 10000)
-          ;(lsp-keep-workspace-alive nil)
-          (lsp-log-io t)
-          ;(lsp-prefer-flymake nil)
-          (lsp-prefer-capf t)
-          (lsp-enable-xref t)
-          ;(lsp-headerline-breadcrumb-enable t)
-          ;(lsp-headerline-breadcrumb-enable-diagnostics t)
-          ;(lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
-          ;(lsp-completion-provider :none)
+          (lsp-disabled-clients '(pyright pylsp))
+          ;;(lsp-pylsp-plugins-jedi-environment (getenv "VIRTUAL_ENV"))
+          ;;(lsp-ruff-server-command "ruff server")
+        :general
+          (:keymaps 'python-mode-map
+            "C-c l r" 'lsp-execute-code-action
+            "C-c l f" 'lsp-format-buffer)
         )
     #+END_SRC
 
@@ -2473,13 +2550,16 @@ exactly that (like what deadgrep does).
     code.
 
     #+BEGIN_SRC emacs-lisp :tangle yes
-      (use-package tree-sitter)
-      (use-package tree-sitter-langs
-        :requires tree-sitter
+      (use-package tree-sitter
+        :requires tree-sitter-langs
         :hook
-        (emacs-startup . global-tree-sitter-mode)
-        ; To enable it whenever possible
-        (tree-sitter-after-on-hook . tree-sitter-hl-mode)
+        (after-init . global-tree-sitter-mode)
+        (tree-sitter-after-on-hook . tree-sitter-hl-mode) ; To enable it whenever possible
+        :config
+        (add-to-list 'treesit-language-source-alist
+                     '(python "https://github.com/tree-sitter/tree-sitter-python"))
+        (add-hook 'python-mode-hook #'tree-sitter-mode)
+        (add-hook 'python-mode-hook #'tree-sitter-hl-mode)
         )
     #+END_SRC
 
@@ -2826,6 +2906,40 @@ exactly that (like what deadgrep does).
                     :filter-return
                     #'my/fix-exs-test-file-name)
       #+END_SRC
+**** Python
+***** VirtualEnv
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package auto-virtualenv
+         :ensure t
+         :init
+         (use-package pyvenv
+           :ensure t)
+         :custom
+         (auto-virtualenv-reload-lsp t)
+         :config
+         (setq auto-virtualenv-verbose t)
+         (auto-virtualenv-setup)
+         (add-hook 'python-mode-hook 'auto-virtualenv-setup)
+         (add-hook 'projectile-after-switch-project-hook 'auto-virtualenv-setup)  ;; If using projectile
+         )
+     #+END_SRC
+
+***** Pytest
+
+     I mostly use =pytest= for testing in python projects.
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package python-pytest
+         :ensure t
+         :general
+         (:keymaps 'python-mode-map
+                   :prefix "C-c"
+                   "t" '(python-pytest-dispatch :which-key "Test"))
+         )
+     #+END_SRC
+
+
 **** HTML et al
 
      #+BEGIN_SRC emacs-lisp :tangle yes

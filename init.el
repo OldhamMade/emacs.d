@@ -40,13 +40,19 @@
 (use-package no-littering
   :ensure t
   :demand t
+  :autoload
+  (no-littering-theme-backups)
   :config
+  (ignore-errors (make-directory (expand-file-name "auto-save/" user-emacs-directory)))
+  (no-littering-theme-backups)
   (setq auto-save-file-name-transforms
     `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
     custom-file (no-littering-expand-etc-file-name "custom.el"))
   (with-eval-after-load 'recentf
-    (add-to-list 'recentf-exclude no-littering-var-directory)
-    (add-to-list 'recentf-exclude no-littering-etc-directory)
+    (add-to-list 'recentf-exclude
+                 (recentf-expand-file-name no-littering-var-directory))
+    (add-to-list 'recentf-exclude
+                 (recentf-expand-file-name no-littering-etc-directory))
     (add-hook 'emacs-startup-hook
       (lambda ()
         (setq recentf-max-menu-items 100
