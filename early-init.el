@@ -303,3 +303,6 @@
 
 ;; Ensure Doom is running out of this file's directory
 (setq user-emacs-directory (file-name-directory load-file-name))
+
+;; Enable use of use-package's inbuilt rough loading time report
+(setq use-package-compute-statistics t)

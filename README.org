@@ -81,7 +81,7 @@ exactly that (like what deadgrep does).
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package savehist
       :after no-littering
-      :hook (emacs-startup . savehist-mode))
+      :hook (after-init . savehist-mode))
     #+END_SRC
 
 *** Startup details
@@ -110,6 +110,11 @@ exactly that (like what deadgrep does).
 *** Use unicode ellipses
     #+BEGIN_SRC emacs-lisp :tangle yes
       (setq truncate-string-ellipsis "…")
+    #+END_SRC
+
+*** Disable =company-mode= globally
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (setq global-company-mode nil)
     #+END_SRC
 
 ** Better GC handling
@@ -431,9 +436,8 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package dash-at-point
-        :general (:prefix "C-c d"
-                  "" '(:ignore t :which-key "Docs") ;; rename +prefix
-                  "d" 'dash-at-point))
+        :general (:prefix "C-c s"
+                  "D" '(dash-at-point :which-key "Dash docs search")))
     #+END_SRC
 
 *** Show "free" keys for new keybindings
@@ -450,7 +454,7 @@ exactly that (like what deadgrep does).
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package mode-line-bell
         :custom (mode-line-bell-flash-time 0.4)
-        :hook (emacs-startup . mode-line-bell-mode))
+        :hook (after-init . mode-line-bell-mode))
     #+END_SRC
 
 *** Present a minimal modeline
@@ -611,43 +615,31 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package balanced-windows
-      :hook (emacs-startup . balanced-windows-mode))
+      :hook (after-init . balanced-windows-mode))
     #+END_SRC
 
 *** Use a popup where possible
 
     #+begin_src emacs-lisp :tangle yes
-    (use-package popwin
-      :hook (emacs-startup . popwin-mode)
-      :config
-      (progn
-        (add-to-list 'popwin:special-display-config `("*Warnings*" :height 0.5 :noselect t))
-        (add-to-list 'popwin:special-display-config `("*Proccess List*" :height 0.5))
-        (add-to-list 'popwin:special-display-config `("*Messages*" :height 0.5 :noselect t))
-        (add-to-list 'popwin:special-display-config `("*Backtrace*" :height 0.5))
-        (add-to-list 'popwin:special-display-config `("*Compile-Log*" :height 0.5 :noselect t))
-        (add-to-list 'popwin:special-display-config `("*Remember*" :height 0.5))
-        (add-to-list 'popwin:special-display-config `("*All*" :height 0.5))
-        (add-to-list 'popwin:special-display-config `(flycheck-error-list-mode :height 0.5 :regexp t :position bottom))
-        (add-to-list 'popwin:special-display-config `(occur-mode :position right :width 100))
-        (add-to-list 'popwin:special-display-config `(grep-mode :position right :width 100))
-        (add-to-list 'popwin:special-display-config `(special-mode :position right :width 100))
-        )
-        )
-    #+end_src
-
-*** Enforce rules for popup windows
-
-    #+begin_src emacs-lisp :tangle no
-      (use-package shackle
-        :hook (emacs-startup . shackle-mode)
+      (use-package popwin
+        :hook (after-init . popwin-mode)
         :config
-          (setq shackle-default-alignment 'right)
-          (setq shackle-rules
-                '(("*exunit-compilation*" :inhibit-window-quit t :align right :other t)
-                  (magit-status-mode :select t :inhibit-window-quit t :align right :other t)
-                  )))
+        (dolist (config `(("*Warnings*" :height 0.3 :noselect t)
+                          ("*Proccess List*" :height 0.3)
+                          ("*Messages*" :height 0.3 :noselect t)
+                          ("*Backtrace*" :height 0.3)
+                          ("*Compile-Log*" :height 0.3 :noselect t)
+                          ("*Remember*" :height 0.3)
+                          ("\\*pytest.*\\*" :regexp t :height 0.3 :tail t)
+                          ("\\*Embark Actions.*\\*" :regexp t :height 0.3 :position bottom :noselect t)
+                          ("*All*" :height 0.3)
+                          (flycheck-error-list-mode :height 0.3 :regexp t :position bottom)
+                          (occur-mode :position right :width 100)
+                          (grep-mode :position right :width 100)
+                          (special-mode :position right :width 100)))
+          (add-to-list 'popwin:special-display-config config)))
     #+end_src
+
 *** Enable Winner mode to be able to undo window changes
 
     #+begin_src emacs-lisp :tangle yes
@@ -685,7 +677,7 @@ exactly that (like what deadgrep does).
 *** Enable auto-save of files as they are edited, so that no changes are lost
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package super-save
-        :hook (emacs-startup . super-save-mode)
+        :hook (after-init . super-save-mode)
         :custom
         (super-save-auto-save-when-idle t)  ;; autosave to the real file
         (super-save-idle-duration 30)  ;; autosave idle wait
@@ -872,9 +864,9 @@ exactly that (like what deadgrep does).
 
     I like the idea, but I seem to struggle to work with it.
 
-    #+BEGIN_SRC emacs-lisp :tangle no
+    #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package centered-cursor-mode
-      :hook (emacs-startup . centered-cursor-mode))
+      :hook (after-init . centered-cursor-mode))
     #+END_SRC
 
     #+BEGIN_SRC emacs-lisp :tangle no
@@ -1064,7 +1056,7 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package pulsar
-        :hook ((emacs-startup . pulsar-global-mode)
+        :hook ((after-init . pulsar-global-mode)
                (consult-after-jump-hook . pulsar-recenter-middle)
                (consult-after-jump-hook . pulsar-reveal-entry))
         :custom
@@ -1117,7 +1109,7 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package browse-url-dwim
-        :hook (emacs-startup . browse-url-dwim-mode))
+        :hook (after-init . browse-url-dwim-mode))
     #+END_SRC
 
 ** Completion
@@ -1138,10 +1130,7 @@ exactly that (like what deadgrep does).
                            :includes (vertico-indexed
                                       vertico-reverse
                                       vertico-multiform))
-        :hook ((emacs-startup . vertico-mode)
-               ;(emacs-startup . vertico-indexed-mode)
-               ;(emacs-startup . vertico-reverse-mode)
-               )
+        :hook (after-init . vertico-mode)
         :custom
           (vertico-resize t)
           (vertico-cycle t)
@@ -1185,8 +1174,7 @@ exactly that (like what deadgrep does).
 
      #+BEGIN_SRC emacs-lisp :tangle yes
      (use-package marginalia
-       :after vertico
-       :hook (emacs-startup . marginalia-mode)
+       :hook (vertico-mode . marginalia-mode)
        )
      #+END_SRC
 
@@ -1308,6 +1296,23 @@ exactly that (like what deadgrep does).
          )
      #+END_SRC
 
+**** Allow killing buffers from the buffer list
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+        (defun consult-switch-buffer-kill ()
+          "Kill candidate buffer at point within the minibuffer completion."
+          (interactive)
+          ; The vertico--candidate has a irregular char at the end.
+          (let ((name  (substring (vertico--candidate) 0 -1)))
+            (when (bufferp (get-buffer name))
+              (kill-buffer name))))
+
+       (general-define-key
+        :keymaps 'minibuffer-local-map
+        "C-k" 'consult-switch-buffer-kill
+        )
+     #+END_SRC
+
 *** Contextual commands care of =Embark=
 
     Embark provides a sort of right-click contextual menu for Emacs, accessed
@@ -1323,14 +1328,6 @@ exactly that (like what deadgrep does).
         :custom
         (prefix-help-command #'embark-prefix-help-command)
         (embark-mixed-indicator-delay 0.1) ;; show embark popup quicker
-        :config
-        ;; Don't quit the minibuffer after removing a buffer from the list
-        (setq embark-quit-after-action '((kill-buffer . t) (t . nil)))
-        (setq embark-verbose-indicator-display-action
-          '(display-buffer-at-bottom
-            (window-height . (lambda (win) (fit-window-to-buffer
-                                       win (floor (frame-height)
-                                                  3))))))
         )
     #+END_SRC
 
@@ -1340,6 +1337,14 @@ exactly that (like what deadgrep does).
      (use-package embark-consult
        :after (consult embark)
        :hook (embark-collect-mode . consult-preview-at-point-mode))
+     #+END_SRC
+
+**** Integrate with forges, such as =magit=
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package embark-vc
+         :ensure t
+         :after embark)
      #+END_SRC
 
 *** Enhance completion-at-point with =Corfu=
@@ -1453,23 +1458,58 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package cape
-        :init
-        ;; Add `completion-at-point-functions', used by `completion-at-point'.
-        (add-to-list 'completion-at-point-functions #'cape-dabbrev)
-        (add-to-list 'completion-at-point-functions #'cape-keyword)
-        (add-to-list 'completion-at-point-functions #'cape-file)
-        (add-to-list 'completion-at-point-functions #'cape-sgml)
-        ;;(add-to-list 'completion-at-point-functions #'cape-ispell)
-        ;;(add-to-list 'completion-at-point-functions #'cape-dict)
-        ;;(add-to-list 'completion-at-point-functions #'cape-tex)
-        ;;(add-to-list 'completion-at-point-functions #'cape-rfc1345)
-        ;;(add-to-list 'completion-at-point-functions #'cape-abbrev)
-        ;;(add-to-list 'completion-at-point-functions #'cape-symbol)
-        ;;(add-to-list 'completion-at-point-functions #'cape-line)
-        :custom
-        (completion-at-point-functions
-         (list (cape-super-capf #'cape-dabbrev #'cape-keyword #'cape-file #'cape-sgml)))
+        :config
+        (defun my/lsp-capf ()
+          "Include `lsp-completion-at-point` only when LSP is active."
+          (when (bound-and-true-p lsp-mode)
+            #'lsp-completion-at-point))
+
+        ;; Set up completion-at-point-functions
+        (setq completion-at-point-functions
+              (list #'my/lsp-capf     ;; Dynamically check for LSP
+                    #'cape-keyword    ;; Add keyword completion
+                    #'cape-dabbrev    ;; Add dynamic abbreviation completion
+                    #'cape-file))     ;; Add file completion
+      )
+    #+END_SRC
+
+*** Improve keyboard navigation via =Casual=
+
+    Casual is a collection of opinionated Transient-based
+    keyboard-driven user interfaces for various built-in Emacs modes.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package casual
+        :ensure t
+        :general
+          (:keymaps 'bookmark-bmenu-mode-map
+            "C-o" 'casual-bookmarks-tmenu)
+          (:keymaps 'calendar-mode-map
+            "C-o" 'casual-calendar)
+          (:keymaps 'dired-mode-map
+            "C-o" 'casual-dired-tmenu
+            "s" 'casual-dired-sort-by-tmenu
+            "/" 'casual-dired-search-replace-tmenu)
         )
+    #+END_SRC
+
+**** Integrate with =avy=
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package casual-avy
+        :ensure t
+        :general ("M-g ." 'casual-avy-tmenu))
+    #+END_SRC
+
+*** Add =transient= menus wherever possible
+
+    =transient-dwim= creates context-specific transient menus for Emacs,
+    where possible.
+
+    #+BEGIN_SRC emacs-lisp :tangle yes
+      (use-package transient-dwim
+       :ensure t
+       :general ("C-c C-?" 'transient-dwim-dispatch))
     #+END_SRC
 
 *** Command discovery care of =which-key=
@@ -1483,7 +1523,7 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package which-key
-        :hook (emacs-startup . which-key-mode)
+        :hook (after-init . which-key-mode)
         :custom
         (which-key-enable-extended-define-key t)
         (which-key-idle-delay .4)
@@ -1671,7 +1711,7 @@ exactly that (like what deadgrep does).
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package electric-pair-mode
          :straight nil ;; it's a built-in
-         :hook (emacs-startup . electric-pair-mode)
+         :hook (after-init . electric-pair-mode)
          :custom
          (electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit)
          :init
@@ -1715,7 +1755,7 @@ exactly that (like what deadgrep does).
 *** Move text with =M-<up>= and =M-<down>=
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package move-text
-      :hook (emacs-startup . move-text-default-bindings))
+      :hook (after-init . move-text-default-bindings))
     #+END_SRC
 
 *** Highlighting
@@ -1828,7 +1868,7 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package ctrlf
-        :hook (emacs-startup . ctrlf-mode)
+        :hook (after-init . ctrlf-mode)
         ;:general ("C-s" 'ctrlf-forward-symbol-at-point)
         :custom
         (ctrlf-auto-recenter t))
@@ -1897,6 +1937,8 @@ exactly that (like what deadgrep does).
            "r" (lambda () (interactive) (setq deadgrep--search-type 'regexp) (deadgrep-restart))
            "s" (lambda () (interactive) (setq deadgrep--search-type 'string) (deadgrep-restart))
            "d" (lambda () (interactive) (deadgrep--directory nil))
+           "C-<return>" 'my/deadgrep-visit-result-and-kill-buffer
+           "C-o" 'my/deadgrep-visit-result-other-window-and-kill-buffer
            "?" 'which-key-show-major-mode)
            (:keymaps 'deadgrep-edit-mode-map
            "<escape>" 'deadgrep-mode)
@@ -1910,7 +1952,22 @@ exactly that (like what deadgrep does).
           (advice-add #'deadgrep-mode :before #'config-editing--on-exit-deadgrep-edit-mode)
           (defun deadgrep--format-command-patch (rg-command)
             "Add --hidden to rg-command."
-            (replace-regexp-in-string "^rg " "rg --hidden " rg-command)))
+            (replace-regexp-in-string "^rg " "rg --hidden " rg-command))
+
+          (defun my/deadgrep-visit-result-and-kill-buffer ()
+            "Visit the result at point in deadgrep and kill the deadgrep buffer."
+            (interactive)
+            (let ((buffer (current-buffer)))
+              (deadgrep-visit-result)
+              (kill-buffer buffer)))
+
+          (defun my/deadgrep-visit-result-other-window-and-kill-buffer ()
+            "Visit the result at point in another window in deadgrep and kill the deadgrep buffer."
+            (interactive)
+            (let ((buffer (current-buffer)))
+              (deadgrep-visit-result-other-window)
+              (kill-buffer buffer)))
+          )
     #+END_SRC
 
 *** Synonym injection
@@ -1997,7 +2054,7 @@ exactly that (like what deadgrep does).
 *** Highlight diff in fringe
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package diff-hl
-      :hook (emacs-startup . global-diff-hl-mode)
+      :hook (after-init . global-diff-hl-mode)
       :general
         (:keymaps 'goto-map
          "M-n" 'diff-hl-next-hunk
@@ -2172,9 +2229,11 @@ exactly that (like what deadgrep does).
 
 *** Projects
 
+**** Manage projects with =projectile=
+
     #+begin_src emacs-lisp :tangle yes
       (use-package projectile
-        :hook (emacs-startup . projectile-mode)
+        :hook (after-init . projectile-mode)
         :general
         (:keymaps 'override
                   "C-x p" '(:keymap projectile-command-map :package projectile :which-key "Projectile"))
@@ -2199,6 +2258,18 @@ exactly that (like what deadgrep does).
             (message "No .projectile file found in project root."))))
 
     #+end_src
+
+**** Integrate =projectile= with =consult=
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package consult-projectile
+         :straight
+           (consult-projectile
+             :type git
+             :host gitlab
+             :repo "OlMon/consult-projectile"
+             :branch "master"))
+     #+END_SRC
 
 **** Custom switch command
 
@@ -2233,7 +2304,7 @@ exactly that (like what deadgrep does).
 
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package persp-projectile
-         :hook (emacs-startup . persp-mode)
+         :hook (after-init . persp-mode)
          :general
          (:keymaps 'perspective-map
           "x" 'projectile-persp-switch-project)
@@ -2243,6 +2314,7 @@ exactly that (like what deadgrep does).
           "p" 'projectile-persp-switch-project)
          )
      #+END_SRC
+
 **** Add Projectile details to ibuffer
 
      #+BEGIN_SRC emacs-lisp :tangle no
@@ -2286,7 +2358,6 @@ exactly that (like what deadgrep does).
 
        (add-hook 'projectile-after-switch-project-hook 'my/projectile-update-exec-path)
      #+END_SRC
-
 
 ** Org
 *** Hide emphasis markers
@@ -2338,7 +2409,7 @@ exactly that (like what deadgrep does).
          :after org
          :hook (org-mode . org-bullets-mode)
          :custom
-           (org-bullets-bullet-list '("☰" "☷" "▶" "●" "✱" "✲" "✸" "⦿" "⌾" "◦"))
+           (org-bullets-bullet-list '("☰" "☷" "▶" "⦿" "●" "⌾" "◦" "✱" "✲" "✸"))
          )
      #+END_SRC
 
@@ -2346,31 +2417,46 @@ exactly that (like what deadgrep does).
 *** General enhancements
 **** =xref=
 
-     #+BEGIN_SRC emacs-lisp :tangle yes
+     #+BEGIN_SRC emacs-lisp :tangle no
        ;; Let me control what backends to fall back on
        (setq-default xref-backend-functions '(t))
      #+END_SRC
 
+     Configure better keyboard shortcuts.
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (general-define-key
+         :keymaps 'global
+         :prefix "C-c s"
+         "X" '(xref-find-definitions :which-key "xref defs")
+         "x" '(xref-find-definitions-other-window :which-key "↗ xref defs")
+         "f" '(xref-find-apropos :which-key "xref find")
+         "F" '(xref-find-references-and-replace :which-key "xref find & replace")
+         )
+     #+END_SRC
+
 **** DWIM with comments
      #+BEGIN_SRC emacs-lisp :tangle yes
-     (use-package comment-dwim-2
-       :general ("M-;" 'comment-dwim-2))
+       (use-package comment-dwim-2
+         :general
+            (:keymaps 'prog-mode-map
+                      "M-;" 'comment-dwim-2
+                      )
+         )
      #+END_SRC
 
 **** Add/remove line breaks between function arguments and similar constructs
      #+BEGIN_SRC emacs-lisp :tangle yes
-     (use-package fill-function-arguments
-       :general (:keymaps 'prog-mode-map
-                 "M-q" 'fill-function-arguments-dwim)
-       :hook (sgml-mode-hook . (lambda ()
-                                 (setq-local fill-function-arguments-first-argument-same-line t)
-                                 (setq-local fill-function-arguments-argument-sep " "))))
+       (use-package fill-function-arguments
+         :general
+           (:keymaps 'prog-mode-map
+                     "M-q" 'fill-function-arguments-dwim)
+         :hook (sgml-mode-hook . (lambda ()
+                                   (setq-local fill-function-arguments-first-argument-same-line t)
+                                   (setq-local fill-function-arguments-argument-sep " "))))
      #+END_SRC
 
 **** Jump to definition using =dumb-jump=
-
-    Note: using init to add the hooks here because the :hook keyword
-    doesn't correctly add dumb-jump.
 
     #+BEGIN_SRC emacs-lisp :tangle yes
       (use-package dumb-jump
@@ -2381,15 +2467,24 @@ exactly that (like what deadgrep does).
         ;(add-to-list 'xref-backend-functions #'dumb-jump-xref-activate t)
         :general
         (:keymaps 'goto-map
-         "j" '(:ignore t :which-key "jump to") ;; rename +prefix
-         "j j" 'dumb-jump-go
-         "j b" 'dumb-jump-back
-         "j o" 'dumb-jump-go-other-window)
+         :prefix "j"
+         "" '(:ignore t :which-key "jump to") ;; rename +prefix
+         "j" '(dumb-jump-go :which-key "Go")
+         "o" '(dumb-jump-go-other-window :which-key "Other window")
+         "e" '(dumb-jump-go-prefer-external :which-key "Go external")
+         "x" '(dumb-jump-go-prefer-external-other-window :which-key "Go external other window")
+         "i" '(dumb-jump-go-prompt :which-key "Prompt")
+         "l" '(dumb-jump-quick-look :which-key "Quick look")
+         "b" '(dumb-jump-back :which-key "Back")
+         )
         :custom
         (dumb-jump-prefer-searcher 'rg)
         (xref-show-definitions-function #'xref-show-definitions-completing-read)
         )
     #+END_SRC
+
+    Note: using init to add the hooks here because the :hook keyword
+    doesn't correctly add dumb-jump.
 
     #+BEGIN_SRC emacs-lisp :tangle no
       (use-package dumb-jump
@@ -2427,12 +2522,16 @@ exactly that (like what deadgrep does).
         )
     #+END_SRC
 
-**** Auto-format code using =apheleia=
+**** Auto-format code using =apheleia= [disabled]
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
+    Disabled for now.
+
+    #FIXME
+
+    #+BEGIN_SRC emacs-lisp :tangle no
       (use-package apheleia
         :hook
-        (emacs-startup . apheleia-global-mode)
+        (after-init . apheleia-global-mode)
         :config
         (push '(mix-format "mix" "format" "-") apheleia-formatters)
         (push '(elixir-mode . mix-format) apheleia-mode-alist)
@@ -2452,6 +2551,14 @@ exactly that (like what deadgrep does).
       (advice-add 'apheleia-format-buffer :around #'my/fix-apheleia-project-dir)
     #+END_SRC
 
+**** Display "cognitive complexity" of code [disabled]
+
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package cognitive-complexity
+        :straight (:host github :repo "abougouffa/cognitive-complexity")
+        :hook (prog-mode . (lambda () (cognitive-complexity-mode 1))))
+    #+END_SRC
+
 *** Language Server Protocol
 
     #+BEGIN_SRC emacs-lisp :tangle yes
@@ -2461,13 +2568,12 @@ exactly that (like what deadgrep does).
         ;; @see https://emacs-lsp.github.io/lsp-mode/page/performance/
         ;(setq read-process-output-max (* 1024 1024)) ;; 1MB
         (setq read-process-output-max 4194304) ;; 4MB
-        ;(setenv "LSP_USE_PLISTS" "true")
         :commands (lsp lsp-deferred)
-        :hook ((lsp-mode . lsp-enable-which-key-integration)
-               ;(elixir-mode . lsp-deferred)
-               (python-mode . lsp-deferred)
-               (lsp-mode . (lambda () (add-to-list 'xref-backend-functions #'dumb-jump-xref-activate t)))
-               )
+        :hook
+          (lsp-mode . lsp-enable-which-key-integration)
+          ;(elixir-mode . lsp-deferred)
+          (python-mode . lsp-deferred)
+
         :config
           (add-to-list 'lsp-language-id-configuration '(python-mode . "python"))
 
@@ -2485,42 +2591,48 @@ exactly that (like what deadgrep does).
           (with-eval-after-load 'lsp-mode
             (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.direnv\\'")
             (add-to-list 'lsp-file-watch-ignored-directories "[/\\\\]\\.git\\'")
-            (remove-hook 'xref-backend-functions 't)
-            (add-hook 'xref-backend-functions #'dumb-jump-xref-activate 0)
-
-            ;; DANGER: dumb-jump-xref-activate as a backend after
-            ;; lsp--xref-backend won't complain if git-grep is left as
-            ;; the default searcher. However, if setting ripgrep as
-            ;; the preferred for everything except for git with (setq
-            ;; dumb-jump-prefer-searcher 'rg) it repeatedly raises:
-            ;; Blocking call to accept-process-output with quit inhibited!!
-            (add-hook 'xref-backend-functions #'lsp--xref-backend 0)
             )
 
+          (add-hook 'lsp-completion-mode-hook
+          (lambda ()
+            (add-to-list 'completion-at-point-functions #'cape-capf-buster)))
+
         :custom
-          ;(lsp-use-plists t) ;; only use with LSP_USE_PLISTS
+          (lsp-completion-enable t)
+          (lsp-completion-provider :capf)
+
+          (lsp-idle-delay 0.5)
           (xref-search-program 'ripgrep)
           (lsp-keymap-prefix "C-c l")
           (lsp-auto-configure t)
           (lsp-auto-guess-root t)
           (lsp-eldoc-enable-hover nil)
-          (lsp-enable-completion-at-point t)
+
+          ;; use corfu and cape for completions from lsp
+          ;;(lsp-enable-completion-at-point t)
+          (lsp-enable-completion-at-point nil)
+          (lsp-enable-snippet t) ;; Enable snippet support for completions
+          (lsp-enable-on-type-formatting t)
+
           (lsp-enable-file-watchers t)
           (lsp-file-watch-threshold 10000)
           (lsp-keep-workspace-alive nil)
           (lsp-log-io nil) ;; enable for debugging
           (lsp-prefer-flymake nil)
-          (lsp-enable-xref nil) ;; needed to allow customization of backends
-          ;(lsp-enable-xref t)
+          (lsp-enable-xref t)
           (lsp-prefer-capf t)
-          (lsp-disabled-clients '(pyright pylsp))
-          ;;(lsp-pylsp-plugins-jedi-environment (getenv "VIRTUAL_ENV"))
-          ;;(lsp-ruff-server-command "ruff server")
+
+          (lsp-jedi-server-command "jedi-language-server")
+          (lsp-pyls-server-command "pylsp")
+
         :general
           (:keymaps 'python-mode-map
             "C-c l r" 'lsp-execute-code-action
-            "C-c l f" 'lsp-format-buffer)
+            "C-c l f" 'lsp-format-buffer
+            "C-c s l" 'lsp-find-implementation
+            )
         )
+
     #+END_SRC
 
 **** Add useful UI features
@@ -2529,10 +2641,27 @@ exactly that (like what deadgrep does).
        (use-package lsp-ui
          :after lsp-mode
          :commands lsp-ui-mode
+         :hook
+         (lsp-mode . lsp-ui-mode)
+         (lsp-ui-mode . (lambda () (flycheck-inline-mode -1)))
          :general
           (:keymaps 'lsp-ui-mode-map
             [remap xref-find-definitions] 'lsp-ui-peek-find-definitions
-            [remap xref-find-references] 'lsp-ui-peek-find-references))
+            [remap xref-find-references] 'lsp-ui-peek-find-references)
+         :custom
+         ;(lsp-ui-doc-enable t)
+         ;(lsp-ui-doc-position 'bottom)
+         ;(lsp-ui-doc-delay 0.5)
+         ;(lsp-ui-doc-show-with-cursor t)
+         (lsp-ui-sideline-enable t)
+         (lsp-ui-sideline-ignore-duplicate t)
+         ;(lsp-ui-sideline-show-diagnostics t)
+         ;(lsp-ui-sideline-show-hover t)
+         ;(lsp-ui-sideline-show-code-actions t)
+         ;(lsp-ui-imenu-enable t)
+         ;(lsp-ui-peek-enable t)
+         ;(lsp-ui-peek-show-directory t)
+         )
      #+END_SRC
 
 *** Debug Adapter Protocol [DISABLED]
@@ -2573,7 +2702,7 @@ exactly that (like what deadgrep does).
 
     #+BEGIN_SRC emacs-lisp :tangle yes
     (use-package flycheck
-      :hook (emacs-startup . global-flycheck-mode)
+      :hook (after-init . global-flycheck-mode)
       :general ("C-c !" '(:ignore t :which-key "FlyCheck")) ;; rename +prefix
       )
     #+END_SRC
@@ -2907,6 +3036,22 @@ exactly that (like what deadgrep does).
                     #'my/fix-exs-test-file-name)
       #+END_SRC
 **** Python
+
+***** =python-mode=
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package python
+         :straight (:type built-in)
+         :hook
+         (python-mode . (lambda ()
+                          (when (functionp 'consult-dash)
+                            (setq-local consult-dash-docsets
+                                        '("Python 3" "pytest"
+                                          "Wagtail" "fastapi" "Django" "Flask"
+                                          "uWSGI" "virtualenv")))))
+         )
+     #+END_SRC
+
 ***** VirtualEnv
 
      #+BEGIN_SRC emacs-lisp :tangle yes
@@ -2927,7 +3072,8 @@ exactly that (like what deadgrep does).
 
 ***** Pytest
 
-     I mostly use =pytest= for testing in python projects.
+     I mostly use =pytest= for testing in python projects, so some
+     integration is useful.
 
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package python-pytest
@@ -2936,7 +3082,37 @@ exactly that (like what deadgrep does).
          (:keymaps 'python-mode-map
                    :prefix "C-c"
                    "t" '(python-pytest-dispatch :which-key "Test"))
+         :custom
+         (python-pytest-use-treesit t)
          )
+     #+END_SRC
+
+****** Make =pytest= work in a BDD way
+
+       Currently =python-pytest= only uses suffixes with =test= in the
+       name, but most projects I work on have a test file suffix of
+       =_spec.py=. Let's advise the function with a replacement.
+
+       #+BEGIN_SRC emacs-lisp :tangle yes
+         (defun my/python-pytest--test-file-p (file)
+           "Determine if FILE is a test file, recognising '_spec.py' as a test file."
+           (or (string-match-p (rx "_test.py" eos) file)
+               (string-match-p (rx "_spec.py" eos) file)))
+
+         (advice-add 'python-pytest--test-file-p :override #'my/python-pytest--test-file-p)
+       #+END_SRC
+
+***** Pyright for LSP
+
+     #+BEGIN_SRC emacs-lisp :tangle yes
+       (use-package lsp-pyright
+         :ensure t
+         :custom
+         (lsp-pyright-langserver-command "pyright")
+         (lsp-pyright-typechecking-mode "basic")
+         :hook (python-mode . (lambda ()
+                                 (require 'lsp-pyright)
+                                 (lsp-deferred))))
      #+END_SRC
 
 
