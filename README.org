@@ -375,6 +375,7 @@ exactly that (like what deadgrep does).
 
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package envrc
+         :requires (inheritenv)
          :hook (after-init . envrc-global-mode)
          :demand t
          :general (:keymaps 'envrc-mode-map
@@ -384,9 +385,17 @@ exactly that (like what deadgrep does).
 
 **** Inherit environment in temp buffers
 
+     There's a fairly common pitfall when Emacs libraries run
+     background processes on behalf of a user: many such libraries run
+     processes in temporary buffers that do not inherit the calling
+     buffer's environment.  This can result in executables not being
+     found, or the wrong versions of executables being picked up.
+     This package is intended to fix that.
+
      #+BEGIN_SRC emacs-lisp :tangle yes
        (use-package inheritenv
-         :after (envrc))
+         :demand t
+         )
      #+END_SRC
 
 ** Theme
@@ -402,22 +411,23 @@ exactly that (like what deadgrep does).
     #+END_SRC
 
 ** Help
-*** Better help
+*** Better help via =helpful= [disabled]
 
     The =helpful= package provides more readable help buffers.
 
-    #+BEGIN_SRC emacs-lisp :tangle yes
-    (use-package helpful
-      :demand t
-      :commands (helpful-callable
-                 helpful-key
-                 helpful-variable
-                 helpful-symbol)
-      :config
-        (defalias 'describe-key 'helpful-key)
-        (defalias 'describe-function 'helpful-callable)
-        (defalias 'describe-variable 'helpful-variable)
-        (defalias 'describe-symbol 'helpful-symbol))
+    #+BEGIN_SRC emacs-lisp :tangle no
+      (use-package helpful
+        :requires (elisp-refs)
+        :demand t
+        :commands (helpful-callable
+                   helpful-key
+                   helpful-variable
+                   helpful-symbol)
+        :config
+          (defalias 'describe-key 'helpful-key)
+          (defalias 'describe-function 'helpful-callable)
+          (defalias 'describe-variable 'helpful-variable)
+          (defalias 'describe-symbol 'helpful-symbol))
     #+END_SRC
 
 *** Focus the =*Help*= buffer when it opens
@@ -2611,7 +2621,7 @@ exactly that (like what deadgrep does).
           ;; use corfu and cape for completions from lsp
           ;;(lsp-enable-completion-at-point t)
           (lsp-enable-completion-at-point nil)
-          (lsp-enable-snippet t) ;; Enable snippet support for completions
+          (lsp-enable-snippet nil) ;; yasnippet isn't installed
           (lsp-enable-on-type-formatting t)
 
           (lsp-enable-file-watchers t)
@@ -2759,7 +2769,11 @@ exactly that (like what deadgrep does).
 
                                   )))
           :init
-          (add-to-list 'exec-path "~/Projects/elixir/elixir-ls/release")
+          (setq lsp-log-io t)
+          (add-to-list 'exec-path (expand-file-name "~/Projects/elixir/elixir-ls/release"))
+          ;(setq lsp-elixir-server-command
+          ;      '("elixir" (expand-file-name "~/Projects/elixir/elixir-ls/release/launch.exs")))
+
           (defun phx/related-files (path)
             (let* ((filename (file-name-nondirectory path))
                    (files (projectile-project-files (projectile-project-root))))
@@ -2787,6 +2801,7 @@ exactly that (like what deadgrep does).
           :custom
           (lsp-elixir-suggest-specs t)
           (lsp-elixir-enable-test-lenses t)
+          (ruby-end-insert-newline nil) ; don't insert a newline so hitting enter works as expected
 
           :general
             (:keymaps 'elixir-mode-map

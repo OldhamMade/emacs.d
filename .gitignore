@@ -3,3 +3,5 @@
 /var/
 /.log/
 /elpa/
+/etc/
+/tree-sitter/
