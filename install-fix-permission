@@ -1,0 +1,2 @@
+#/bin/bash
+sudo codesign --force --deep --sign - /usr/local/opt/emacs-plus@31/Emacs.app
